@@ -1618,6 +1618,32 @@ jobs:
           name: librustdesk.so.${{ matrix.job.target }}
           path: ./target/${{ matrix.job.target }}/release/liblibrustdesk.so
 
+      # Maven Central rate-limits shared CI runners (HTTP 429), which breaks
+      # Flutter's own Gradle plugin build. Fetch Maven Central artifacts from
+      # Google's mirror instead.
+      - name: Use Maven Central mirror
+        shell: bash
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/lingxi-maven-mirror.gradle <<'GRADLE'
+          def mirror = 'https://maven-central.storage-download.googleapis.com/maven2/'
+          def redirect = { RepositoryHandler repos ->
+              repos.withType(MavenArtifactRepository).configureEach { repo ->
+                  if (repo.url.toString().startsWith('https://repo.maven.apache.org')) {
+                      repo.url = mirror
+                  }
+              }
+          }
+          beforeSettings { settings ->
+              redirect(settings.pluginManagement.repositories)
+              redirect(settings.buildscript.repositories)
+          }
+          allprojects {
+              redirect(buildscript.repositories)
+              redirect(repositories)
+          }
+          GRADLE
+
       - name: Build rustdesk
         shell: bash
         env:
