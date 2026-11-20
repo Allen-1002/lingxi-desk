@@ -19,6 +19,11 @@ on:
 
 jobs:
   run-ci:
+    # The reusable build workflow has jobs (e.g. generate-sbom) that request
+    # contents: write; a caller must grant at least that much or the run
+    # fails at startup.
+    permissions:
+      contents: write
     uses: ./.github/workflows/flutter-build.yml
     with:
       upload-artifact: true
