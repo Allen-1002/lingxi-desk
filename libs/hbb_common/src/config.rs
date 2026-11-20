@@ -117,8 +117,9 @@ const CHARS: &[char] = &[
     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];
-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
+// Lingxi: the default self-hosted server (hbbs + hbbr on the same host).
+pub const RENDEZVOUS_SERVERS: &[&str] = &["47.111.107.215"];
+pub const RS_PUB_KEY: &str = "UqFcIPc3mmYlEUlAWEPCkdQUu3MJWOeUniyL4h7C1WI=";
 
 pub const RENDEZVOUS_PORT: i32 = 21116;
 pub const RELAY_PORT: i32 = 21117;
@@ -1059,7 +1060,12 @@ impl Config {
             rendezvous_server = PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
         }
         if rendezvous_server.is_empty() {
-            rendezvous_server = CONFIG2.read().unwrap().rendezvous_server.clone();
+            // The fastest server remembered from earlier runs, but only if it is
+            // still one of the current defaults (older builds cached RustDesk's).
+            let cached = CONFIG2.read().unwrap().rendezvous_server.clone();
+            if Self::get_rendezvous_servers().contains(&cached) {
+                rendezvous_server = cached;
+            }
         }
         if rendezvous_server.is_empty() {
             rendezvous_server = Self::get_rendezvous_servers()
