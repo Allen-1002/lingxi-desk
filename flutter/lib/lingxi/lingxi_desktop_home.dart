@@ -13,6 +13,7 @@ import 'package:window_manager/window_manager.dart';
 import '../common.dart';
 import '../consts.dart';
 import '../models/platform_model.dart';
+import '../utils/multi_window_manager.dart';
 import 'lingxi_devices.dart';
 import 'lingxi_theme.dart';
 
@@ -25,7 +26,8 @@ class LingxiDesktopHome extends StatefulWidget {
 
 enum _Page { thisMac, devices, settings }
 
-class _LingxiDesktopHomeState extends State<LingxiDesktopHome> {
+class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
+    with WindowListener {
   _Page _page = _Page.thisMac;
   Timer? _timer;
   String _id = '';
@@ -45,6 +47,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome> {
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
     gFFI.lanPeersModel.addListener(_changed);
     gFFI.recentPeersModel.addListener(_changed);
     lxRefreshDevices();
@@ -60,10 +63,25 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _timer?.cancel();
     gFFI.lanPeersModel.removeListener(_changed);
     gFFI.recentPeersModel.removeListener(_changed);
     super.dispose();
+  }
+
+  /// The close button hides the main window (upstream prevents a real
+  /// close): the app keeps running so this computer stays reachable.
+  @override
+  void onWindowClose() async {
+    if (rustDeskWinManager.getActiveWindows().contains(kMainWindowId)) {
+      await rustDeskWinManager.unregisterActiveWindow(kMainWindowId);
+    }
+    if (isMacOS && await windowManager.isFullScreen()) {
+      await windowManager.setFullScreen(false);
+      await Future.delayed(const Duration(milliseconds: 800));
+    }
+    await windowManager.hide();
   }
 
   void _changed() {
@@ -332,7 +350,11 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome> {
               }),
               Divider(height: 1, color: LxColors.hairline(context)),
               _permRow(context, '辅助功能', '让手机操作鼠标和键盘', _access, () {
+                // macOS shows its own prompt only once per app; open the
+                // settings pane so the button always does something.
                 bind.mainIsProcessTrusted(prompt: true);
+                launchUrl(Uri.parse(
+                    'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'));
               }),
               Divider(height: 1, color: LxColors.hairline(context)),
               _permRow(context, '后台服务', '锁屏、没登录时也能连（需要输入一次 Mac 密码）',
