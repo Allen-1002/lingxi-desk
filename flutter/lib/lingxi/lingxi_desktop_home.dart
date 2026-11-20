@@ -72,7 +72,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome> {
 
   Future<void> _tick() async {
     await gFFI.serverModel.fetchID();
-    final id = gFFI.serverModel.serverId.id;
+    final id = gFFI.serverModel.serverId.text.replaceAll(" ", "");
     final ips = await lxLocalIps();
     final stopped = await mainGetBoolOption(kOptionStopService);
     bool screen = true, access = true, daemon = true;
