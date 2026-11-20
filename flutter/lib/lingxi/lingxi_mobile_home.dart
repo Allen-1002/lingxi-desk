@@ -13,6 +13,7 @@ import '../consts.dart';
 import '../models/platform_model.dart';
 import 'lingxi_devices.dart';
 import 'lingxi_theme.dart';
+import 'lingxi_update.dart';
 
 class LingxiMobileHome extends StatefulWidget {
   const LingxiMobileHome({super.key});
@@ -32,6 +33,7 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
     gFFI.recentPeersModel.addListener(_changed);
     lxRefreshDevices();
     _timer = Timer.periodic(const Duration(seconds: 8), (_) => lxRefreshDevices());
+    LxUpdater.instance.check();
   }
 
   @override
@@ -138,6 +140,7 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
             ),
           ]),
           const SizedBox(height: 20),
+          const LxUpdateTile(banner: true),
           if (devices.isEmpty) _emptyState(context),
           if (paired.isNotEmpty) ...[
             LxSectionTitle('我的设备 · ${paired.length}'),
@@ -439,6 +442,7 @@ class _SettingsTabState extends State<_SettingsTab> {
     final touch = bind.mainGetLocalOption(key: kOptionTouchMode) != 'N';
     final vm = bind.mainGetLocalOption(key: kOptionShowVirtualMouse);
     _control = touch ? (vm == 'N' ? 'touch' : 'mouse') : 'trackpad';
+    LxUpdater.instance.loadCurrent();
     bind.mainGetVersion().then((v) {
       if (mounted) setState(() => _version = v);
     });
@@ -568,12 +572,19 @@ class _SettingsTabState extends State<_SettingsTab> {
         const SizedBox(height: 18),
         const LxSectionTitle('关于'),
         Glass(
-          child: Row(children: [
-            const LxLogo(size: 28),
-            const SizedBox(width: 12),
-            Text('灵犀', style: label()),
-            const Spacer(),
-            Text(_version, style: TextStyle(color: LxColors.subtext(context))),
+          child: Column(children: [
+            Row(children: [
+              const LxLogo(size: 28),
+              const SizedBox(width: 12),
+              Text('灵犀', style: label()),
+              const Spacer(),
+              Text('内核 $_version',
+                  style: TextStyle(color: LxColors.subtext(context))),
+            ]),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: LxColors.hairline(context)),
+            const SizedBox(height: 10),
+            const LxUpdateTile(),
           ]),
         ),
       ],

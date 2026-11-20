@@ -668,6 +668,24 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                 }
+                "lingxi_can_install" -> {
+                    result.success(AppUpdater.canInstall(this))
+                }
+                "lingxi_open_install_permission" -> {
+                    AppUpdater.openInstallPermission(this)
+                    result.success(null)
+                }
+                "lingxi_install_apk" -> {
+                    val path = call.arguments as? String
+                    if (path == null) {
+                        result.success("缺少安装包路径")
+                    } else {
+                        thread {
+                            val err = AppUpdater.install(this, path)
+                            runOnUiThread { result.success(err) }
+                        }
+                    }
+                }
                 "on_voice_call_started" -> {
                     onVoiceCallStarted()
                 }
