@@ -84,7 +84,8 @@ async fn unavailable_host_clears_local_trust_before_removal() {
         .unwrap();
     let previous = Config2::get_for_sync().unwrap();
     let settings = Config::get();
-    let options = Config::get_options();
+    // The stored options, without built-in defaults such as direct-server.
+    let options = previous.options.clone();
     config::refresh_from_server().await.unwrap();
     let imported: Config2 = hbb_common::config::load_path(Config2::file());
     assert_eq!(Config::get(), settings);
