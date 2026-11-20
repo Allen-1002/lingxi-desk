@@ -239,6 +239,9 @@ impl<T: InvokeUiSession> Remote<T> {
                     .set_connection_type(is_secured, direct, stream_type); // flutter -> connection_ready
                 if !is_secured
                     && !crate::common::is_direct_ip_access(&self.handler.get_id())
+                    // Lingxi Desk: a direct LAN connection to a device on this
+                    // network is expected to have no server-signed key.
+                    && !client::is_lan_direct_peer(&self.handler.get_id())
                     && !client::confirm_insecure_connection(&self.handler, &mut self.receiver).await
                 {
                     self.send_close_reason(&mut peer, "").await;

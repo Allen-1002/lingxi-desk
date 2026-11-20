@@ -5955,6 +5955,12 @@ mod kx_tests {
     }
 }
 
+/// Lingxi Desk: true when the device has a known LAN address, i.e. the
+/// connection was (or would be) made directly on the local network.
+pub fn is_lan_direct_peer(id: &str) -> bool {
+    !lan_addresses_for(id).is_empty()
+}
+
 /// Lingxi Desk: how long one LAN direct attempt may take before falling back.
 const LAN_DIRECT_TIMEOUT_MS: u64 = 1500;
 

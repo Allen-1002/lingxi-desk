@@ -158,7 +158,7 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
               child: Column(
                   children: others
                       .map((d) => LxDeviceTile(
-                          device: d, onTap: () => lxConnect(context, d.id)))
+                          device: d, onTap: () => _showPairChoice(context, d)))
                       .toList()),
             ),
           ],
@@ -265,6 +265,55 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
                 }),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// An unpaired device: offer QR pairing first (no password ever after),
+  /// or a one-off connection the computer has to accept.
+  void _showPairChoice(BuildContext context, LxDevice d) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Glass(
+          radius: 26,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(d.name,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: LxColors.text(ctx))),
+              const SizedBox(height: 4),
+              Text('这台设备还没配对',
+                  style: TextStyle(fontSize: 13, color: LxColors.subtext(ctx))),
+              const SizedBox(height: 18),
+              LxButton('扫码配对（推荐）',
+                  icon: Icons.qr_code_scanner_rounded, onPressed: () {
+                Navigator.pop(ctx);
+                _openScanner(context);
+              }),
+              const SizedBox(height: 6),
+              Text('扫它窗口里的二维码，以后点一下就连，不用密码',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: LxColors.subtext(ctx))),
+              const SizedBox(height: 14),
+              LxButton('只连这一次', secondary: true, onPressed: () {
+                Navigator.pop(ctx);
+                lxConnect(context, d.id);
+              }),
+              const SizedBox(height: 6),
+              Text('需要在电脑上点「接受」',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: LxColors.subtext(ctx))),
+            ],
           ),
         ),
       ),
