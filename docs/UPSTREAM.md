@@ -9,4 +9,4 @@
 
 合并上游更新时，按上表版本做三方对比后再合入。上游原 README 保存在 `docs/upstream/`。
 
-已删除的上游工作流：flutter-nightly、fdroid、playground、third-party-RustDeskTempTopMostWindow、update-webpki-roots（依赖上游发布环境或定时任务）。CI 触发分支已从 master 改为 main。
+已删除的上游工作流：flutter-nightly、fdroid、playground、update-webpki-roots（依赖上游发布环境或定时任务）。CI 触发分支已从 master 改为 main。
