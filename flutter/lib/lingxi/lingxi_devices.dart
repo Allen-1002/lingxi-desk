@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import '../common.dart';
 import '../models/peer_model.dart';
 import '../models/platform_model.dart';
+import 'lingxi_server.dart';
 import 'lingxi_theme.dart';
 
 const _kSelfPairKey = 'lingxi-self-pair-key';
@@ -115,6 +116,13 @@ Future<String?> lxApplyPairingPayload(String text) async {
   if (name.isNotEmpty) {
     await bind.mainSetLocalOption(key: _nameOption(id), value: name);
   }
+  // Use the computer's server, so both sides meet on the same one.
+  final srv = uri.queryParameters['srv'] ?? '';
+  final srvKey = uri.queryParameters['srvkey'] ?? '';
+  if (srv.isNotEmpty &&
+      (srv != lxServerAddress() || srvKey != lxServerKey())) {
+    await lxSetServer(srv, srvKey);
+  }
   return id;
 }
 
@@ -161,6 +169,9 @@ String lxPairingPayload(
       'key': key,
       if (ips.isNotEmpty) 'ip': ips.join(','),
       if (name.isNotEmpty) 'name': name,
+      if (lxServerAddress().isNotEmpty) 'srv': lxServerAddress(),
+      if (lxServerAddress().isNotEmpty && lxServerKey().isNotEmpty)
+        'srvkey': lxServerKey(),
     }).toString();
 
 /// One row in a device list.

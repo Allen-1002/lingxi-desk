@@ -12,6 +12,7 @@ import '../common/widgets/trackpad_ballistics.dart';
 import '../consts.dart';
 import '../models/platform_model.dart';
 import 'lingxi_devices.dart';
+import 'lingxi_server.dart';
 import 'lingxi_theme.dart';
 import 'lingxi_update.dart';
 
@@ -599,6 +600,9 @@ class _SettingsTabState extends State<_SettingsTab> {
             ]),
           ]),
         ),
+        const SizedBox(height: 18),
+        const LxSectionTitle('连接'),
+        const Glass(child: LxServerTile()),
         const SizedBox(height: 18),
         const LxSectionTitle('关于'),
         Glass(
