@@ -393,6 +393,15 @@ impl Client {
         match Self::_start(peer, key, token, conn_type, interface.clone()).await {
             Err(err) => {
                 let err_str = err.to_string();
+                // Lingxi Desk: say plainly that the server could not be reached.
+                if let Some(rest) = err_str.strip_prefix("Failed to connect to ") {
+                    let addr = rest.split(": ").next().unwrap_or(rest);
+                    if !addr.contains(' ') {
+                        bail!(
+                            "连不上服务器 {addr}。请检查网络，以及服务器的防火墙是否放行了 21115-21119 端口（含 UDP 21116）。"
+                        );
+                    }
+                }
                 if err_str.starts_with("Failed") {
                     bail!(err_str + ": Please try later");
                 } else {
@@ -5263,6 +5272,7 @@ pub fn check_if_retry(msgtype: &str, title: &str, text: &str, retry_for_relay: b
                         .to_lowercase()
                         .contains("connection reset without closing handshake") && use_ws())
                 && !text.to_lowercase().contains("failed")
+                && !text.contains("连不上服务器")
                 && !text.to_lowercase().contains("resolve")
                 && !text.to_lowercase().contains("mismatch")
                 && !text.to_lowercase().contains("manually")

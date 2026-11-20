@@ -859,9 +859,12 @@ pub fn peer_exists(id: &str) -> bool {
 
 #[inline]
 pub fn get_lan_peers() -> Vec<HashMap<&'static str, String>> {
+    // Lingxi Desk: only peers that answered the last LAN discovery, so a device
+    // is not shown as "on the LAN" after the phone leaves the network.
     config::LanPeers::load()
         .peers
         .iter()
+        .filter(|peer| peer.online)
         .map(|peer| {
             HashMap::<&str, String>::from_iter([
                 ("id", peer.id.clone()),
