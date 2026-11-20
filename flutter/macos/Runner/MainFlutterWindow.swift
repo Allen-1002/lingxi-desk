@@ -55,21 +55,26 @@ class MainFlutterWindow: NSWindow {
         )
     }
 
-    /// Lingxi Desk: frosted-glass main window. The Flutter view is made
-    /// transparent and a behind-window NSVisualEffectView fills the frame,
-    /// so the system blur shows through wherever Flutter paints nothing.
+    /// Lingxi Desk: frosted-glass main window. Only the main window gets it:
+    /// the same executable also runs the connection manager popup (`--cm`)
+    /// and other helper modes, which must stay ordinary opaque windows.
+    /// The window style is left alone (upstream already hides the title bar
+    /// and draws its own); we only make the Flutter view transparent and put
+    /// a behind-window blur view underneath it.
     private func applyLingxiVibrancy(_ controller: FlutterViewController) {
+        let args = CommandLine.arguments.dropFirst()
+        if args.contains(where: { $0.hasPrefix("--") }) {
+            return
+        }
+        guard let flutterView = controller.view as NSView?,
+              let frameView = flutterView.superview else {
+            return
+        }
         if #available(macOS 10.14, *) {
             controller.backgroundColor = .clear
         }
         self.isOpaque = false
         self.backgroundColor = .clear
-        self.titlebarAppearsTransparent = true
-        self.styleMask.insert(.fullSizeContentView)
-        guard let flutterView = controller.view as NSView?,
-              let frameView = flutterView.superview else {
-            return
-        }
         let effect = NSVisualEffectView(frame: frameView.bounds)
         effect.autoresizingMask = [.width, .height]
         effect.blendingMode = .behindWindow
