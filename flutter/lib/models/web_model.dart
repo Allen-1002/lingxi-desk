@@ -126,6 +126,8 @@ class PlatformFFI {
     throw UnimplementedError();
   }
 
+  (int, int)? getRgbaDims(SessionID sessionId, int display) => null;
+
   int getRgbaSize(SessionID sessionId, int display) =>
       _ffiBind.sessionGetRgbaSize(sessionId: sessionId, display: display);
   void nextRgba(SessionID sessionId, int display) =>

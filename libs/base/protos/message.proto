@@ -700,6 +700,9 @@ message OptionMessage {
   BoolOption disable_camera = 17;
   BoolOption terminal_persistent = 18;
   BoolOption show_my_cursor = 19;
+  // Lingxi Desk: longest edge, in pixels, the controller wants frames shrunk
+  // to. 0 = not set, -1 = full size.
+  int32 max_video_size = 20;
 }
 
 message TestDelay {

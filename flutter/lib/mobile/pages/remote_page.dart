@@ -1219,6 +1219,13 @@ class ImagePaint extends StatelessWidget {
         s = s / displays[0].scale;
       }
     }
+    // Lingxi Desk: a frame shrunk by the computer is drawn at display size.
+    final img = m.image;
+    final rect = ffiModel.rect;
+    if (img != null && rect != null && img.width > 0 && rect.width > 0) {
+      final k = rect.width / img.width;
+      if ((k - 1).abs() > 0.01) s = s * k;
+    }
     final adjust = c.getAdjustY();
     return CustomPaint(
       painter: ImagePainter(

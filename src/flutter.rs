@@ -278,6 +278,10 @@ struct RgbaData {
     // We must check the `rgba_valid` before reading [rgba].
     data: Vec<u8>,
     valid: bool,
+    // Lingxi Desk: size of the frame in [data]; smaller than the display
+    // when the computer shrinks frames for a phone.
+    w: usize,
+    h: usize,
 }
 
 pub type FlutterRgbaRendererPluginOnRgba = unsafe extern "C" fn(
@@ -1219,9 +1223,13 @@ impl FlutterHandler {
             }
             // Return the rgba buffer to the video handler for reusing allocated rgba buffer.
             std::mem::swap::<Vec<u8>>(&mut rgba.raw, &mut rgba_data.data);
+            rgba_data.w = rgba.w;
+            rgba_data.h = rgba.h;
         } else {
             let mut rgba_data = RgbaData::default();
             std::mem::swap::<Vec<u8>>(&mut rgba.raw, &mut rgba_data.data);
+            rgba_data.w = rgba.w;
+            rgba_data.h = rgba.h;
             rgba_data.valid = true;
             rgba_write_lock.insert(display, rgba_data);
         }
@@ -1731,6 +1739,20 @@ pub fn session_get_rgba_size(session_id: SessionID, display: usize) -> usize {
             .unwrap()
             .get(&display)
             .map_or(0, |rgba| rgba.data.len());
+    }
+    0
+}
+
+/// Lingxi Desk: width and height of the frame [session_get_rgba] returns,
+/// packed as `(width << 32) | height`; 0 when unknown.
+#[no_mangle]
+pub extern "C" fn session_get_rgba_dims(session_uuid_str: *const char, display: usize) -> u64 {
+    if let Ok(session_id) = char_to_session_id(session_uuid_str) {
+        if let Some(s) = sessions::get_session_by_session_id(&session_id) {
+            if let Some(d) = s.display_rgbas.read().unwrap().get(&display) {
+                return ((d.w as u64) << 32) | (d.h as u64 & 0xffff_ffff);
+            }
+        }
     }
     0
 }

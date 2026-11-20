@@ -4948,6 +4948,9 @@ impl Connection {
                 .unwrap()
                 .user_custom_fps(self.inner.id(), o.custom_fps as _);
         }
+        if o.max_video_size != 0 {
+            video_service::set_max_video_size(self.inner.id(), o.max_video_size);
+        }
         if let Some(q) = o.supported_decoding.clone().take() {
             scrap::codec::Encoder::update(scrap::codec::EncodingUpdate::Update(self.inner.id(), q));
         }
@@ -5997,6 +6000,7 @@ impl Connection {
             && option.image_quality.enum_value() == Ok(ImageQuality::NotSet)
             && option.custom_image_quality == 0
             && option.custom_fps == 0
+            && option.max_video_size == 0
             && Self::is_bool_option_not_set(option.lock_after_session_end)
             && Self::is_bool_option_not_set(option.show_remote_cursor)
             && Self::is_bool_option_not_set(option.privacy_mode)
@@ -6158,6 +6162,7 @@ impl Connection {
         option.image_quality.enum_value() != Ok(ImageQuality::NotSet)
             || option.custom_image_quality != 0
             || option.custom_fps != 0
+            || option.max_video_size != 0
             || option.supported_decoding.is_some()
             || !Self::is_bool_option_not_set(option.lock_after_session_end)
             || !Self::is_bool_option_not_set(option.show_remote_cursor)
@@ -6958,6 +6963,7 @@ mod raii {
                     .lock()
                     .unwrap()
                     .on_connection_open(conn_id);
+                video_service::on_max_video_size_open(conn_id);
             }
             Self(conn_id, conn_type)
         }
@@ -7080,6 +7086,7 @@ mod raii {
                     .lock()
                     .unwrap()
                     .on_connection_close(self.0);
+                video_service::on_max_video_size_close(self.0);
             }
             // Clear per-connection state to avoid stale behavior if conn ids are reused.
             #[cfg(not(any(target_os = "android", target_os = "ios")))]

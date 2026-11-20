@@ -1976,10 +1976,14 @@ class ImageModel with ChangeNotifier {
   decodeAndUpdate(int display, Uint8List rgba) async {
     final pid = parent.target?.id;
     final rect = parent.target?.ffiModel.pi.getDisplayRect(display);
+    // Lingxi Desk: the frame can be smaller than the display when the
+    // computer shrinks it for a phone; ImagePaint stretches it back.
+    final sid = parent.target?.sessionId;
+    final dims = sid == null ? null : platformFFI.getRgbaDims(sid, display);
     final image = await img.decodeImageFromPixels(
       rgba,
-      rect?.width.toInt() ?? 0,
-      rect?.height.toInt() ?? 0,
+      dims?.$1 ?? rect?.width.toInt() ?? 0,
+      dims?.$2 ?? rect?.height.toInt() ?? 0,
       isWeb | isWindows | isLinux
           ? ui.PixelFormat.rgba8888
           : ui.PixelFormat.bgra8888,

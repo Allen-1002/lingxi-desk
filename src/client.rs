@@ -3451,6 +3451,12 @@ impl LoginConfigHandler {
             msg.disable_clipboard = BoolOption::Yes.into();
         }
         msg.supported_decoding = MessageField::some(self.get_supported_decoding());
+        // Lingxi Desk: phones ask the computer to shrink large (e.g. 4K) frames
+        // before encoding. On by default, off with the "lingxi-shrink-video" option.
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        if LocalConfig::get_option("lingxi-shrink-video") != "N" {
+            msg.max_video_size = LINGXI_PHONE_MAX_VIDEO_SIZE;
+        }
         Some(msg)
     }
 
@@ -5985,3 +5991,7 @@ fn lan_addresses_for(id: &str) -> Vec<String> {
     }
     out
 }
+
+/// Lingxi Desk: longest frame edge a phone asks for when shrinking is on.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+const LINGXI_PHONE_MAX_VIDEO_SIZE: i32 = 1920;

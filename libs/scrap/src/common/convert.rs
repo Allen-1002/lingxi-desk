@@ -20,11 +20,76 @@ pub fn convert_to_yuv(
     dst: &mut Vec<u8>,
     mid_data: &mut Vec<u8>,
 ) -> ResultType<()> {
+    convert_raw_to_yuv(
+        captured.data(),
+        &captured.stride(),
+        captured.pixfmt(),
+        captured.width(),
+        captured.height(),
+        dst_fmt,
+        dst,
+        mid_data,
+    )
+}
+
+/// Lingxi Desk: shrink a 4-byte-per-pixel frame to `width` x `height`
+/// before converting it, so a phone does not receive a full 4K stream.
+#[cfg(not(target_os = "ios"))]
+pub fn convert_to_yuv_scaled(
+    captured: &PixelBuffer,
+    width: usize,
+    height: usize,
+    dst_fmt: EncodeYuvFormat,
+    dst: &mut Vec<u8>,
+    mid_data: &mut Vec<u8>,
+    scaled: &mut Vec<u8>,
+) -> ResultType<()> {
+    let pixfmt = captured.pixfmt();
+    if pixfmt != crate::Pixfmt::BGRA && pixfmt != crate::Pixfmt::RGBA {
+        bail!("scaling is not supported for {pixfmt:?}");
+    }
     let src = captured.data();
     let src_stride = captured.stride();
-    let src_pixfmt = captured.pixfmt();
-    let src_width = captured.width();
-    let src_height = captured.height();
+    let (src_width, src_height) = (captured.width(), captured.height());
+    if src_stride.is_empty() || src.len() < src_stride[0] * src_height {
+        bail!("wrong src len for scaling");
+    }
+    let dst_stride = width * 4;
+    scaled.resize(dst_stride * height, 0);
+    call_yuv!(ARGBScale(
+        src.as_ptr(),
+        src_stride[0] as _,
+        src_width as _,
+        src_height as _,
+        scaled.as_mut_ptr(),
+        dst_stride as _,
+        width as _,
+        height as _,
+        FilterMode::kFilterBilinear,
+    ));
+    convert_raw_to_yuv(
+        scaled,
+        &[dst_stride],
+        pixfmt,
+        width,
+        height,
+        dst_fmt,
+        dst,
+        mid_data,
+    )
+}
+
+#[cfg(not(target_os = "ios"))]
+fn convert_raw_to_yuv(
+    src: &[u8],
+    src_stride: &[usize],
+    src_pixfmt: crate::Pixfmt,
+    src_width: usize,
+    src_height: usize,
+    dst_fmt: EncodeYuvFormat,
+    dst: &mut Vec<u8>,
+    mid_data: &mut Vec<u8>,
+) -> ResultType<()> {
     if src_width > dst_fmt.w || src_height > dst_fmt.h {
         bail!(
             "src rect > dst rect: ({src_width}, {src_height}) > ({},{})",

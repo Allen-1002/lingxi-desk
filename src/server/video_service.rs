@@ -123,6 +123,8 @@ type FrameFetchedNotifierSender = UnboundedSender<(i32, Option<Instant>)>;
 type FrameFetchedNotifierReceiver = Arc<TokioMutex<UnboundedReceiver<(i32, Option<Instant>)>>>;
 
 lazy_static::lazy_static! {
+    // Lingxi Desk: per connection, the longest frame edge it asked for (0 = full size).
+    static ref MAX_VIDEO_SIZE: Mutex<HashMap<i32, u32>> = Default::default();
     static ref FRAME_FETCHED_NOTIFIERS: Mutex<HashMap<usize, (FrameFetchedNotifierSender, FrameFetchedNotifierReceiver)>> = Mutex::new(HashMap::default());
 
     // display_idx -> set of conn id.
@@ -658,8 +660,23 @@ fn run(vs: VideoService) -> ResultType<()> {
     );
     let client_record = video_qos.record();
     drop(video_qos);
+    let max_video_size = effective_max_video_size();
+    let scaled_size = if vs.source.is_monitor() {
+        scaled_frame_size(c.width, c.height, max_video_size)
+    } else {
+        None
+    };
+    let enc_size = scaled_size.unwrap_or((c.width, c.height));
+    if let Some((w, h)) = scaled_size {
+        log::info!(
+            "shrinking frames {}x{} -> {w}x{h} (max {max_video_size})",
+            c.width,
+            c.height
+        );
+    }
     let (mut encoder, encoder_cfg, codec_format, use_i444, recorder) = match setup_encoder(
         &c,
+        enc_size,
         sp.name(),
         quality,
         client_record,
@@ -672,14 +689,15 @@ fn run(vs: VideoService) -> ResultType<()> {
         Err(err) => {
             log::error!("Failed to create encoder: {err:?}, fallback to VP9");
             Encoder::set_fallback(&EncoderCfg::VPX(VpxEncoderConfig {
-                width: c.width as _,
-                height: c.height as _,
+                width: enc_size.0 as _,
+                height: enc_size.1 as _,
                 quality,
                 codec: VpxVideoCodecId::VP9,
                 keyframe_interval: None,
             }));
             setup_encoder(
                 &c,
+                enc_size,
                 sp.name(),
                 quality,
                 client_record,
@@ -731,8 +749,18 @@ fn run(vs: VideoService) -> ResultType<()> {
     let mut first_frame = true;
     // Set once the encoder emits its first packet; until then it may legitimately return nothing.
     let mut encoder_warmed_up = false;
-    let capture_width = c.width;
-    let capture_height = c.height;
+    // A VRAM encoder takes captured textures as they are, so it never shrinks.
+    #[cfg(feature = "vram")]
+    let scaled_size = if matches!(encoder_cfg, EncoderCfg::VRAM(_)) {
+        None
+    } else {
+        scaled_size
+    };
+    let mut scaled_data = Vec::new();
+    let (capture_width, capture_height) = match scaled_size {
+        Some(size) => size,
+        None => (c.width, c.height),
+    };
     let mut static_refresh = static_refresh::StaticRefresh::new(
         vs.source,
         codec_format,
@@ -767,6 +795,10 @@ fn run(vs: VideoService) -> ResultType<()> {
                 let _ = try_broadcast_display_changed(&sp, display_idx, &c, true);
             }
             log::info!("switch to refresh");
+            bail!("SWITCH");
+        }
+        if vs.source.is_monitor() && effective_max_video_size() != max_video_size {
+            log::info!("switch due to requested frame size changed");
             bail!("SWITCH");
         }
         if codec_format != Encoder::negotiated_codec() {
@@ -866,7 +898,21 @@ fn run(vs: VideoService) -> ResultType<()> {
                         }
                     }
 
-                    let frame = frame.to(encoder.yuvfmt(), &mut yuv, &mut mid_data)?;
+                    let frame = match (scaled_size, &frame) {
+                        (Some((w, h)), scrap::Frame::PixelBuffer(pb)) => {
+                            scrap::convert_to_yuv_scaled(
+                                pb,
+                                w,
+                                h,
+                                encoder.yuvfmt(),
+                                &mut yuv,
+                                &mut mid_data,
+                                &mut scaled_data,
+                            )?;
+                            EncodeInput::YUV(&yuv)
+                        }
+                        _ => frame.to(encoder.yuvfmt(), &mut yuv, &mut mid_data)?,
+                    };
                     static_refresh.on_frame(&frame);
                     let result = handle_one_frame(
                         display_idx,
@@ -1066,6 +1112,7 @@ impl Drop for Raii {
 
 fn setup_encoder(
     c: &CapturerInfo,
+    size: (usize, usize),
     name: String,
     quality: f32,
     client_record: bool,
@@ -1082,6 +1129,7 @@ fn setup_encoder(
 )> {
     let encoder_cfg = get_encoder_config(
         &c,
+        size,
         name.to_string(),
         quality,
         client_record || record_incoming,
@@ -1098,6 +1146,7 @@ fn setup_encoder(
 
 fn get_encoder_config(
     c: &CapturerInfo,
+    size: (usize, usize),
     _name: String,
     quality: f32,
     record: bool,
@@ -1132,23 +1181,23 @@ fn get_encoder_config(
                 return EncoderCfg::HWRAM(HwRamEncoderConfig {
                     name: hw.name,
                     mc_name: hw.mc_name,
-                    width: c.width,
-                    height: c.height,
+                    width: size.0,
+                    height: size.1,
                     quality,
                     keyframe_interval,
                 });
             }
             EncoderCfg::VPX(VpxEncoderConfig {
-                width: c.width as _,
-                height: c.height as _,
+                width: size.0 as _,
+                height: size.1 as _,
                 quality,
                 codec: VpxVideoCodecId::VP9,
                 keyframe_interval,
             })
         }
         format @ (CodecFormat::VP8 | CodecFormat::VP9) => EncoderCfg::VPX(VpxEncoderConfig {
-            width: c.width as _,
-            height: c.height as _,
+            width: size.0 as _,
+            height: size.1 as _,
             quality,
             codec: if format == CodecFormat::VP8 {
                 VpxVideoCodecId::VP8
@@ -1158,14 +1207,14 @@ fn get_encoder_config(
             keyframe_interval,
         }),
         CodecFormat::AV1 => EncoderCfg::AOM(AomEncoderConfig {
-            width: c.width as _,
-            height: c.height as _,
+            width: size.0 as _,
+            height: size.1 as _,
             quality,
             keyframe_interval,
         }),
         _ => EncoderCfg::VPX(VpxEncoderConfig {
-            width: c.width as _,
-            height: c.height as _,
+            width: size.0 as _,
+            height: size.1 as _,
             quality,
             codec: VpxVideoCodecId::VP9,
             keyframe_interval,
@@ -1588,5 +1637,66 @@ mod tests {
         assert!(refresh_allowed(false, false, true));
         // Nothing fed yet: no warm-up to lose, and a refresh can restart a stalled capturer.
         assert!(refresh_allowed(true, false, false));
+    }
+}
+
+/// Lingxi Desk: a controller that is connected but has not asked counts as
+/// wanting full size.
+pub fn on_max_video_size_open(conn_id: i32) {
+    MAX_VIDEO_SIZE.lock().unwrap().insert(conn_id, 0);
+}
+
+pub fn on_max_video_size_close(conn_id: i32) {
+    MAX_VIDEO_SIZE.lock().unwrap().remove(&conn_id);
+}
+
+/// `size` > 0 asks for frames no longer than `size` pixels on either edge;
+/// anything else asks for full size.
+pub fn set_max_video_size(conn_id: i32, size: i32) {
+    let mut m = MAX_VIDEO_SIZE.lock().unwrap();
+    if let Some(v) = m.get_mut(&conn_id) {
+        *v = if size > 0 { size as u32 } else { 0 };
+    }
+}
+
+/// Frames are shrunk only when every connected controller asked for it, so a
+/// controller that expects full-size frames never gets small ones.
+fn effective_max_video_size() -> u32 {
+    let m = MAX_VIDEO_SIZE.lock().unwrap();
+    if m.is_empty() || m.values().any(|v| *v == 0) {
+        0
+    } else {
+        m.values().copied().max().unwrap_or(0)
+    }
+}
+
+/// The shrunk frame size for a `width` x `height` capture, or None when it
+/// already fits. Both edges stay even, as YUV 4:2:0 needs.
+fn scaled_frame_size(width: usize, height: usize, max: u32) -> Option<(usize, usize)> {
+    let max = max as usize;
+    let long = width.max(height);
+    if max < 320 || long <= max || width == 0 || height == 0 {
+        return None;
+    }
+    let even = |v: f64| ((v / 2.0).round() as usize * 2).max(2);
+    let f = max as f64 / long as f64;
+    Some((even(width as f64 * f), even(height as f64 * f)))
+}
+
+#[cfg(test)]
+mod lingxi_scale_tests {
+    use super::scaled_frame_size;
+
+    #[test]
+    fn shrinks_4k_to_fit() {
+        assert_eq!(scaled_frame_size(3840, 2160, 1920), Some((1920, 1080)));
+        assert_eq!(scaled_frame_size(2160, 3840, 1920), Some((1080, 1920)));
+        assert_eq!(scaled_frame_size(5120, 2880, 1920), Some((1920, 1080)));
+    }
+
+    #[test]
+    fn leaves_small_frames() {
+        assert_eq!(scaled_frame_size(1920, 1080, 1920), None);
+        assert_eq!(scaled_frame_size(3840, 2160, 0), None);
     }
 }

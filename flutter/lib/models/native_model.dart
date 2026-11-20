@@ -23,6 +23,8 @@ final class RgbaFrame extends Struct {
 
 typedef F3 = Pointer<Uint8> Function(Pointer<Utf8>, int);
 typedef F3Dart = Pointer<Uint8> Function(Pointer<Utf8>, Int32);
+typedef FRgbaDims = int Function(Pointer<Utf8>, int);
+typedef FRgbaDimsNative = Uint64 Function(Pointer<Utf8>, Int32);
 typedef HandleEvent = Future<void> Function(Map<String, dynamic> evt);
 
 /// The Linux bundle keeps the core library at lib/librustdesk.so next to the
@@ -63,6 +65,7 @@ class PlatformFFI {
   void setBindingForTesting(RustdeskImpl binding) => _ffiBind = binding;
 
   F3? _session_get_rgba;
+  FRgbaDims? _session_get_rgba_dims;
 
   static get localeName => Platform.localeName;
 
@@ -123,6 +126,23 @@ class PlatformFFI {
     }
   }
 
+  /// Lingxi Desk: (width, height) of the current frame, or null when the
+  /// core does not report it. Smaller than the display when the computer
+  /// shrinks frames for a phone.
+  (int, int)? getRgbaDims(SessionID sessionId, int display) {
+    final f = _session_get_rgba_dims;
+    if (f == null) return null;
+    final a = sessionId.toString().toNativeUtf8();
+    try {
+      final v = f(a, display);
+      final w = (v >> 32) & 0xffffffff, h = v & 0xffffffff;
+      if (w <= 0 || h <= 0) return null;
+      return (w, h);
+    } finally {
+      malloc.free(a);
+    }
+  }
+
   int getRgbaSize(SessionID sessionId, int display) =>
       _ffiBind.sessionGetRgbaSize(sessionId: sessionId, display: display);
   void nextRgba(SessionID sessionId, int display) =>
@@ -153,6 +173,10 @@ class PlatformFFI {
     debugPrint('initializing FFI $_appType');
     try {
       _session_get_rgba = dylib.lookupFunction<F3Dart, F3>("session_get_rgba");
+      try {
+        _session_get_rgba_dims = dylib.lookupFunction<FRgbaDimsNative, FRgbaDims>(
+            "session_get_rgba_dims");
+      } catch (_) {}
       try {
         // SYSTEM user failed
         _dir = (await getApplicationDocumentsDirectory()).path;

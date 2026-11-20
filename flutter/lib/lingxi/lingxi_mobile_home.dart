@@ -428,6 +428,7 @@ class _SettingsTabState extends State<_SettingsTab> {
   late TrackpadAccelProfile _accel;
   late String _quality;
   late String _control;
+  late bool _shrink;
   String _version = '';
 
   @override
@@ -442,6 +443,7 @@ class _SettingsTabState extends State<_SettingsTab> {
     final touch = bind.mainGetLocalOption(key: kOptionTouchMode) != 'N';
     final vm = bind.mainGetLocalOption(key: kOptionShowVirtualMouse);
     _control = touch ? (vm == 'N' ? 'touch' : 'mouse') : 'trackpad';
+    _shrink = bind.mainGetLocalOption(key: 'lingxi-shrink-video') != 'N';
     LxUpdater.instance.loadCurrent();
     bind.mainGetVersion().then((v) {
       if (mounted) setState(() => _version = v);
@@ -560,14 +562,42 @@ class _SettingsTabState extends State<_SettingsTab> {
         const SizedBox(height: 18),
         const LxSectionTitle('画质'),
         Glass(
-          child: segmented<String>([
-            (kRemoteImageQualityLow, '流畅'),
-            (kRemoteImageQualityBalanced, '平衡'),
-            (kRemoteImageQualityBest, '清晰'),
-          ], _quality.isEmpty ? kRemoteImageQualityBalanced : _quality, (v) {
-            setState(() => _quality = v);
-            bind.mainSetUserDefaultOption(key: kOptionImageQuality, value: v);
-          }),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            segmented<String>([
+              (kRemoteImageQualityLow, '流畅'),
+              (kRemoteImageQualityBalanced, '平衡'),
+              (kRemoteImageQualityBest, '清晰'),
+            ], _quality.isEmpty ? kRemoteImageQualityBalanced : _quality, (v) {
+              setState(() => _quality = v);
+              bind.mainSetUserDefaultOption(key: kOptionImageQuality, value: v);
+            }),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('缩小高分辨率画面', style: label()),
+                      const SizedBox(height: 2),
+                      Text('电脑是 2K、4K 屏时，先缩小到 1080p 再传，延迟更低、更省流量。关掉就按原分辨率传，更清晰。下次连接时生效。',
+                          style: TextStyle(
+                              fontSize: 13,
+                              height: 1.45,
+                              color: LxColors.subtext(context))),
+                    ]),
+              ),
+              const SizedBox(width: 12),
+              Switch(
+                value: _shrink,
+                activeColor: LxColors.indigoDeep,
+                onChanged: (v) {
+                  setState(() => _shrink = v);
+                  bind.mainSetLocalOption(
+                      key: 'lingxi-shrink-video', value: v ? 'Y' : 'N');
+                },
+              ),
+            ]),
+          ]),
         ),
         const SizedBox(height: 18),
         const LxSectionTitle('关于'),
