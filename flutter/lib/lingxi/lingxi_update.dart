@@ -1,10 +1,14 @@
-// Lingxi Desk: in-app update from GitHub Releases (Android).
+// Lingxi Desk: in-app update from GitHub Releases.
 //
-// A release is a tag vX.Y.Z on Allen-1002/lingxi-desk with an asset named
-// LingxiDesk-X.Y.Z-android-arm64.apk (res/lingxi/release-android.sh makes
-// it). The phone downloads the APK and hands it to the system installer.
-// Android itself refuses an update that is not signed with the same key as
-// the installed app, so a tampered download cannot be installed.
+// A release is a tag vX.Y.Z on Allen-1002/lingxi-desk. All platforms share
+// the version in flutter/pubspec.yaml, and each has one asset:
+//   Android  LingxiDesk-X.Y.Z-android-arm64.apk  (res/lingxi/release-android.sh)
+//   macOS    LingxiDesk-X.Y.Z-macos-arm64.zip    (res/lingxi/release-macos.sh)
+//   Windows  LingxiDesk-X.Y.Z-windows-x64.zip    (.github/workflows/lingxi-windows.yml)
+// Android hands the APK to the system installer, which refuses an update
+// not signed with the installed app's key. macOS checks the new bundle is
+// signed by the same team before swapping it in. Windows swaps the program
+// folder after the app exits.
 
 import 'dart:async';
 import 'dart:convert';
@@ -26,6 +30,16 @@ const _kCheckEvery = Duration(hours: 6);
 
 String lxAndroidAssetName(String version) =>
     'LingxiDesk-$version-android-arm64.apk';
+String lxMacAssetName(String version) => 'LingxiDesk-$version-macos-arm64.zip';
+String lxWindowsAssetName(String version) =>
+    'LingxiDesk-$version-windows-x64.zip';
+
+String? _assetNameFor(String version) {
+  if (Platform.isAndroid) return lxAndroidAssetName(version);
+  if (Platform.isMacOS) return lxMacAssetName(version);
+  if (Platform.isWindows) return lxWindowsAssetName(version);
+  return null;
+}
 
 /// "v1.2.3" / "1.2" / "1.2.3-beta" -> [1, 2, 3]; null when unparsable.
 List<int>? lxParseVersion(String s) {
@@ -78,7 +92,8 @@ class LxUpdater extends ChangeNotifier {
   int _apkSize = 0;
   DateTime? _checkedAt;
 
-  bool get supported => Platform.isAndroid;
+  bool get supported =>
+      Platform.isAndroid || Platform.isMacOS || Platform.isWindows;
   bool get busy =>
       state == LxUpdateState.checking ||
       state == LxUpdateState.downloading ||
@@ -131,7 +146,7 @@ class LxUpdater extends ChangeNotifier {
       _apkUrl = null;
       _apkSize = 0;
       for (final a in (j['assets'] as List? ?? const [])) {
-        if (a is Map && a['name'] == lxAndroidAssetName(latest)) {
+        if (a is Map && a['name'] == _assetNameFor(latest)) {
           _apkUrl = a['browser_download_url'] as String?;
           _apkSize = (a['size'] as num?)?.toInt() ?? 0;
         }
@@ -151,7 +166,7 @@ class LxUpdater extends ChangeNotifier {
   Future<void> downloadAndInstall() async {
     final url = _apkUrl;
     if (!supported || busy || url == null) return;
-    if (!await _ensureInstallPermission()) return;
+    if (Platform.isAndroid && !await _ensureInstallPermission()) return;
     progress = 0;
     _set(LxUpdateState.downloading);
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
@@ -160,7 +175,7 @@ class LxUpdater extends ChangeNotifier {
       final dir = Directory('${(await getTemporaryDirectory()).path}/updates');
       if (await dir.exists()) await dir.delete(recursive: true);
       await dir.create(recursive: true);
-      file = File('${dir.path}/${lxAndroidAssetName(latest)}');
+      file = File('${dir.path}/${_assetNameFor(latest)}');
       final req = await client.getUrl(Uri.parse(url));
       req.headers.set('User-Agent', 'LingxiDesk-Updater');
       final res = await req.close();
@@ -189,6 +204,14 @@ class LxUpdater extends ChangeNotifier {
       }
       progress = 1;
       _set(LxUpdateState.installing);
+      if (Platform.isMacOS) {
+        await _installMac(file, dir);
+        return;
+      }
+      if (Platform.isWindows) {
+        await _installWindows(file, dir);
+        return;
+      }
       final err = await gFFI.invokeMethodWithResult<String>(
           'lingxi_install_apk', file.path);
       if (err != null && err.isNotEmpty) throw err;
@@ -205,6 +228,84 @@ class LxUpdater extends ChangeNotifier {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// Unpack the new LingxiDesk.app, check it is signed by the same team as
+  /// the running one, then swap it in after this app quits and reopen it.
+  Future<void> _installMac(File zip, Directory dir) async {
+    final exe = File(Platform.resolvedExecutable);
+    // .../LingxiDesk.app/Contents/MacOS/LingxiDesk
+    final current = exe.parent.parent.parent.path;
+    if (!current.endsWith('.app')) throw '找不到当前程序的位置';
+    final out = Directory('${dir.path}/unpacked');
+    var r = await Process.run('/usr/bin/ditto', ['-x', '-k', zip.path, out.path]);
+    if (r.exitCode != 0) throw '解压失败：${r.stderr}';
+    final apps = out
+        .listSync()
+        .whereType<Directory>()
+        .where((d) => d.path.endsWith('.app'))
+        .toList();
+    if (apps.length != 1) throw '安装包里没有找到程序';
+    final fresh = apps.first.path;
+    r = await Process.run('/usr/bin/codesign', ['--verify', '--deep', '--strict', fresh]);
+    if (r.exitCode != 0) throw '新版本的签名校验失败，已停止更新';
+    final mine = await _macTeam(current), theirs = await _macTeam(fresh);
+    if (mine == null || mine != theirs) {
+      throw '新版本的签名和当前版本不一致，已停止更新';
+    }
+    final script = File('${dir.path}/swap.sh');
+    await script.writeAsString('''#!/bin/bash
+# Lingxi Desk updater: swap the app bundle once the old one has quit.
+while kill -0 $pid 2>/dev/null; do sleep 0.3; done
+rm -rf "$current.old"
+mv "$current" "$current.old" && mv "$fresh" "$current" && rm -rf "$current.old"
+/usr/bin/xattr -dr com.apple.quarantine "$current" 2>/dev/null
+/usr/bin/open "$current"
+''');
+    await Process.start('/bin/bash', [script.path],
+        mode: ProcessStartMode.detached);
+    exit(0);
+  }
+
+  static Future<String?> _macTeam(String app) async {
+    final r = await Process.run('/usr/bin/codesign', ['-dv', '--verbose=2', app]);
+    final m = RegExp(r'TeamIdentifier=(\S+)').firstMatch('${r.stderr}');
+    final team = m?.group(1);
+    return team == null || team == 'not' ? null : team;
+  }
+
+  /// Unpack the new program folder, then copy it over the current one after
+  /// this app quits and start it again.
+  Future<void> _installWindows(File zip, Directory dir) async {
+    final exe = File(Platform.resolvedExecutable);
+    final current = exe.parent.path;
+    final out = Directory('${dir.path}\\unpacked');
+    final r = await Process.run('powershell', [
+      '-NoProfile',
+      '-Command',
+      "Expand-Archive -LiteralPath '${zip.path}' -DestinationPath '${out.path}' -Force",
+    ]);
+    if (r.exitCode != 0) throw '解压失败：${r.stderr}';
+    var src = out.path;
+    final inner = out.listSync().whereType<Directory>().toList();
+    if (!File('$src\\${exe.uri.pathSegments.last}').existsSync() &&
+        inner.length == 1) {
+      src = inner.first.path;
+    }
+    if (!File('$src\\${exe.uri.pathSegments.last}').existsSync()) {
+      throw '安装包里没有找到程序';
+    }
+    final script = File('${dir.path}\\swap.cmd');
+    await script.writeAsString('''@echo off
+rem Lingxi Desk updater: replace the program folder once the app has quit.
+:wait
+tasklist /FI "PID eq $pid" 2>NUL | find "$pid" >NUL && (timeout /t 1 /nobreak >NUL & goto wait)
+robocopy "$src" "$current" /E /R:5 /W:1 >NUL
+start "" "${exe.path}"
+''');
+    await Process.start('cmd', ['/c', script.path],
+        mode: ProcessStartMode.detached);
+    exit(0);
   }
 
   Future<bool> _ensureInstallPermission() async {

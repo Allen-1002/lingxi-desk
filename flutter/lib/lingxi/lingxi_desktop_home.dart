@@ -16,6 +16,7 @@ import '../models/platform_model.dart';
 import '../utils/multi_window_manager.dart';
 import 'lingxi_devices.dart';
 import 'lingxi_theme.dart';
+import 'lingxi_update.dart';
 
 class LingxiDesktopHome extends StatefulWidget {
   const LingxiDesktopHome({super.key});
@@ -55,6 +56,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
       if (mounted) setState(() => _pairKey = k);
     });
     _tick();
+    LxUpdater.instance.check();
     _timer = Timer.periodic(const Duration(seconds: 2), (t) {
       _tick();
       if (t.tick % 5 == 0) lxRefreshDevices();
@@ -210,6 +212,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
       key: const ValueKey('this'),
       padding: const EdgeInsets.fromLTRB(28, 4, 28, 28),
       children: [
+        const LxUpdateTile(banner: true),
         LayoutBuilder(builder: (context, c) {
           final wide = c.maxWidth > 760;
           final info = Glass(
@@ -484,6 +487,7 @@ class _DesktopSettingsState extends State<_DesktopSettings> {
     _lanDirect = option2bool(kOptionDirectServer,
         bind.mainGetOptionSync(key: kOptionDirectServer));
     _quality = bind.mainGetUserDefaultOption(key: kOptionImageQuality);
+    LxUpdater.instance.loadCurrent();
     bind.mainGetVersion().then((v) {
       if (mounted) setState(() => _version = v);
     });
@@ -554,12 +558,18 @@ class _DesktopSettingsState extends State<_DesktopSettings> {
         const SizedBox(height: 18),
         const LxSectionTitle('关于'),
         Glass(
-          child: Row(children: [
-            const LxLogo(size: 28),
-            const SizedBox(width: 12),
-            Text('灵犀', style: t()),
-            const Spacer(),
-            Text(_version, style: s()),
+          child: Column(children: [
+            Row(children: [
+              const LxLogo(size: 28),
+              const SizedBox(width: 12),
+              Text('灵犀', style: t()),
+              const Spacer(),
+              Text('内核 $_version', style: s()),
+            ]),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: LxColors.hairline(context)),
+            const SizedBox(height: 10),
+            const LxUpdateTile(),
           ]),
         ),
       ],
