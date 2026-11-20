@@ -402,6 +402,18 @@ class _PairScanPageState extends State<_PairScanPage> {
   }
 }
 
+String _controlHint(String mode) {
+  const common = '双指上下滑动＝滚动，双指张合＝放大缩小，三指上滑＝调度中心（Windows 为任务视图），三指左右滑＝切换桌面。';
+  switch (mode) {
+    case 'touch':
+      return '手指点哪里就点到哪里，长按＝右键。$common';
+    case 'trackpad':
+      return '屏幕当触控板用，单指移动箭头，轻点＝左键，长按＝右键。$common';
+    default:
+      return '屏幕当触控板用，单指移动箭头，屏幕上另有左键、右键和滚轮按钮。$common';
+  }
+}
+
 class _SettingsTab extends StatefulWidget {
   const _SettingsTab();
   @override
@@ -412,6 +424,7 @@ class _SettingsTabState extends State<_SettingsTab> {
   late double _sensitivity;
   late TrackpadAccelProfile _accel;
   late String _quality;
+  late String _control;
   String _version = '';
 
   @override
@@ -423,6 +436,11 @@ class _SettingsTabState extends State<_SettingsTab> {
     _accel = trackpadAccelProfileFromString(
         bind.mainGetLocalOption(key: kOptionTrackpadAccel));
     _quality = bind.mainGetUserDefaultOption(key: kOptionImageQuality);
+    final touch = bind.mainGetLocalOption(key: kOptionTouchMode) == 'Y';
+    final vm = bind.mainGetLocalOption(key: kOptionShowVirtualMouse);
+    _control = touch
+        ? 'touch'
+        : (vm == 'N' ? 'trackpad' : 'mouse');
     bind.mainGetVersion().then((v) {
       if (mounted) setState(() => _version = v);
     });
@@ -485,6 +503,25 @@ class _SettingsTabState extends State<_SettingsTab> {
         const LxSectionTitle('鼠标与触控'),
         Glass(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('操控方式', style: label()),
+            const SizedBox(height: 10),
+            segmented<String>([
+              ('mouse', '虚拟鼠标'),
+              ('trackpad', '触控板'),
+              ('touch', '直接触摸'),
+            ], _control, (v) {
+              setState(() => _control = v);
+              bind.mainSetLocalOption(
+                  key: kOptionTouchMode, value: v == 'touch' ? 'Y' : 'N');
+              bind.mainSetLocalOption(
+                  key: kOptionShowVirtualMouse,
+                  value: v == 'mouse' ? 'Y' : 'N');
+            }),
+            const SizedBox(height: 8),
+            Text(_controlHint(_control),
+                style: TextStyle(
+                    fontSize: 13, height: 1.45, color: LxColors.subtext(context))),
+            const SizedBox(height: 14),
             Row(children: [
               Text('指针速度', style: label()),
               const Spacer(),

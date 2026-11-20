@@ -1889,8 +1889,10 @@ class VirtualMouseMode with ChangeNotifier {
   }
 
   void loadOptions() {
-    _showVirtualMouse =
-        bind.mainGetLocalOption(key: kOptionShowVirtualMouse) == 'Y';
+    // Lingxi Desk: the on-screen mouse buttons are on by default in mouse
+    // (trackpad) mode.
+    final vm = bind.mainGetLocalOption(key: kOptionShowVirtualMouse);
+    _showVirtualMouse = vm == 'Y' || (vm.isEmpty && !ffiModel.touchMode);
     _virtualMouseScale = double.tryParse(
             bind.mainGetLocalOption(key: kOptionVirtualMouseScale)) ??
         1.0;

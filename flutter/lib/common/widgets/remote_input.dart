@@ -91,8 +91,16 @@ class _RawTouchGestureDetectorRegionState
   Offset _cacheLongPressPosition = Offset(0, 0);
   // Timestamp of the last long press event.
   int _cacheLongPressPositionTs = 0;
-  double _mouseScrollIntegral = 0; // mouse scroll speed controller
   double _scale = 1;
+  // Lingxi Desk: a two-finger gesture is either a scroll sent to the remote
+  // computer (fingers move together) or a pinch that zooms the local view.
+  // It is decided once per gesture so the two never fight.
+  int _twoFingerMode = _kTwoUndecided;
+  Offset _twoFingerTravel = Offset.zero;
+  double _twoFingerScrollAcc = 0;
+  // Lingxi Desk: three-finger swipes are system gestures on the remote side.
+  Offset _threeFingerTravel = Offset.zero;
+  bool _threeFingerFired = false;
 
   // Workaround tap down event when two fingers are used to scale(mobile)
   TapDownDetails? _lastTapDownDetails;
@@ -499,6 +507,9 @@ class _RawTouchGestureDetectorRegionState
   // scale + pan event
   onTwoFingerScaleStart(ScaleStartDetails d) {
     _lastTapDownDetails = null;
+    _twoFingerMode = _kTwoUndecided;
+    _twoFingerTravel = Offset.zero;
+    _twoFingerScrollAcc = 0;
     if (isNotTouchBasedDevice()) {
       return;
     }
@@ -538,10 +549,33 @@ class _RawTouchGestureDetectorRegionState
       }
     } else {
       // mobile
-      ffi.canvasModel.updateScale(d.scale / _scale, d.focalPoint);
-      _scale = d.scale;
-      ffi.canvasModel.panX(d.focalPointDelta.dx);
-      ffi.canvasModel.panY(d.focalPointDelta.dy);
+      if (_twoFingerMode == _kTwoUndecided) {
+        _twoFingerTravel += d.focalPointDelta;
+        if ((d.scale - 1).abs() > 0.08) {
+          _twoFingerMode = _kTwoZoom;
+        } else if (_twoFingerTravel.distance > 12) {
+          _twoFingerMode = _kTwoScroll;
+          _twoFingerScrollAcc = _twoFingerTravel.dy;
+        } else {
+          return;
+        }
+        _scale = d.scale;
+        if (_twoFingerMode == _kTwoZoom) return;
+      }
+      if (_twoFingerMode == _kTwoZoom) {
+        ffi.canvasModel.updateScale(d.scale / _scale, d.focalPoint);
+        _scale = d.scale;
+        ffi.canvasModel.panX(d.focalPointDelta.dx);
+        ffi.canvasModel.panY(d.focalPointDelta.dy);
+      } else {
+        // Natural scrolling: the content follows the fingers.
+        _twoFingerScrollAcc += d.focalPointDelta.dy;
+        while (_twoFingerScrollAcc.abs() >= _kScrollStepPx) {
+          final step = _twoFingerScrollAcc > 0 ? 1 : -1;
+          _twoFingerScrollAcc -= step * _kScrollStepPx;
+          await inputModel.scroll(step);
+        }
+      }
     }
   }
 
@@ -567,18 +601,54 @@ class _RawTouchGestureDetectorRegionState
   }
 
   get onHoldDragCancel => null;
-  get onThreeFingerVerticalDragUpdate => ffi.ffiModel.isPeerAndroid
-      ? null
-      : (d) {
-          _mouseScrollIntegral += d.delta.dy / 4;
-          if (_mouseScrollIntegral > 1) {
-            inputModel.scroll(1);
-            _mouseScrollIntegral = 0;
-          } else if (_mouseScrollIntegral < -1) {
-            inputModel.scroll(-1);
-            _mouseScrollIntegral = 0;
-          }
-        };
+  onThreeFingerSwipeStart(DragStartDetails d) {
+    _threeFingerTravel = Offset.zero;
+    _threeFingerFired = false;
+  }
+
+  /// Lingxi Desk: three-finger swipes do what they do on a trackpad.
+  /// Mac: up = Mission Control, down = app windows, left/right = switch
+  /// desktop. Windows: up = Task View, down = show desktop, left/right =
+  /// switch virtual desktop.
+  onThreeFingerSwipeUpdate(DragUpdateDetails d) {
+    if (_threeFingerFired || ffi.ffiModel.isPeerAndroid) return;
+    _threeFingerTravel += d.delta;
+    final t = _threeFingerTravel;
+    if (t.distance < 60) return;
+    _threeFingerFired = true;
+    final vertical = t.dy.abs() >= t.dx.abs();
+    final mac = ffi.ffiModel.pi.platform == kPeerPlatformMacOS;
+    if (vertical) {
+      if (mac) {
+        _sendCombo(t.dy < 0 ? 'VK_UP' : 'VK_DOWN', ctrl: true);
+      } else {
+        _sendCombo(t.dy < 0 ? 'VK_TAB' : 'VK_D', command: true);
+      }
+    } else {
+      // Fingers moving left bring in the desktop on the right.
+      final key = t.dx < 0 ? 'VK_RIGHT' : 'VK_LEFT';
+      if (mac) {
+        _sendCombo(key, ctrl: true);
+      } else {
+        _sendCombo(key, ctrl: true, command: true);
+      }
+    }
+  }
+
+  void _sendCombo(String key, {bool ctrl = false, bool command = false}) {
+    final m = inputModel;
+    final oldCtrl = m.ctrl, oldCommand = m.command;
+    final oldAlt = m.alt, oldShift = m.shift;
+    m.ctrl = ctrl;
+    m.command = command;
+    m.alt = false;
+    m.shift = false;
+    m.inputKey(key);
+    m.ctrl = oldCtrl;
+    m.command = oldCommand;
+    m.alt = oldAlt;
+    m.shift = oldShift;
+  }
 
   makeGestures(BuildContext context) {
     return <Type, GestureRecognizerFactory>{
@@ -635,7 +705,8 @@ class _RawTouchGestureDetectorRegionState
           ..onTwoFingerScaleStart = onTwoFingerScaleStart
           ..onTwoFingerScaleUpdate = onTwoFingerScaleUpdate
           ..onTwoFingerScaleEnd = onTwoFingerScaleEnd
-          ..onThreeFingerVerticalDragUpdate = onThreeFingerVerticalDragUpdate;
+          ..onThreeFingerVerticalDragStart = onThreeFingerSwipeStart
+          ..onThreeFingerVerticalDragUpdate = onThreeFingerSwipeUpdate;
       }),
     };
   }
@@ -731,3 +802,8 @@ class CameraRawPointerMouseRegion extends StatelessWidget {
     );
   }
 }
+
+const int _kTwoUndecided = 0;
+const int _kTwoScroll = 1;
+const int _kTwoZoom = 2;
+const double _kScrollStepPx = 10;

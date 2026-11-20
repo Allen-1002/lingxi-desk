@@ -5,6 +5,7 @@
 // is the real system blur and these panels sit on top of it. Elsewhere we
 // paint an aurora gradient and blur it inside each glass panel.
 
+import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -27,6 +28,9 @@ class LxColors {
   static Color glassFill(BuildContext c) => isDark(c)
       ? const Color(0xFF1C1E26).withOpacity(0.55)
       : Colors.white.withOpacity(0.62);
+  static Color solidGlassFill(BuildContext c) => isDark(c)
+      ? const Color(0xFF1C1E26).withOpacity(0.82)
+      : Colors.white.withOpacity(0.78);
   static Color glassBorder(BuildContext c) => isDark(c)
       ? Colors.white.withOpacity(0.10)
       : Colors.white.withOpacity(0.75);
@@ -42,6 +46,9 @@ class LxColors {
 /// behind-window NSVisualEffectView swallowed input on macOS, so every
 /// platform draws the aurora background and blurs it in Flutter.
 const bool lxNativeVibrancy = false;
+
+/// Phones skip the live backdrop blur (see [Glass]).
+bool get lxCheapGlass => Platform.isAndroid || Platform.isIOS;
 
 /// Full-screen aurora background. Transparent on macOS desktop so the native
 /// vibrancy shows through.
@@ -118,6 +125,20 @@ class Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
+    // A live blur under every panel costs a full re-blur each frame on phones
+    // and made scrolling and sheet animations stutter. Phones get a solid
+    // frosted fill over the aurora instead, which looks almost the same.
+    if (lxCheapGlass) {
+      return Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: LxColors.solidGlassFill(context),
+          borderRadius: r,
+          border: Border.all(color: LxColors.glassBorder(context), width: 1),
+        ),
+        child: child,
+      );
+    }
     return ClipRRect(
       borderRadius: r,
       child: BackdropFilter(
