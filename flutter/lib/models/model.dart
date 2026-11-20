@@ -1400,13 +1400,9 @@ class FfiModel with ChangeNotifier {
       // 2. The advanced option (custom client) is set.
       //    Then we choose to use the local option.
       final optLocal = bind.mainGetLocalOption(key: kOptionTouchMode);
-      if (optLocal != '') {
-        _touchMode = optLocal == 'Y';
-      } else {
-        final optSession = await bind.sessionGetOption(
-            sessionId: sessionId, arg: kOptionTouchMode);
-        _touchMode = optSession != '';
-      }
+      // Lingxi Desk: the default is the on-screen virtual mouse, which
+      // lives in touch mode.
+      _touchMode = optLocal != 'N';
     }
     if (isMobile) {
       virtualMouseMode.loadOptions();
@@ -1889,10 +1885,9 @@ class VirtualMouseMode with ChangeNotifier {
   }
 
   void loadOptions() {
-    // Lingxi Desk: the on-screen mouse buttons are on by default in mouse
-    // (trackpad) mode.
+    // Lingxi Desk: the draggable on-screen mouse is on by default.
     final vm = bind.mainGetLocalOption(key: kOptionShowVirtualMouse);
-    _showVirtualMouse = vm == 'Y' || (vm.isEmpty && !ffiModel.touchMode);
+    _showVirtualMouse = vm == 'Y' || (vm.isEmpty && ffiModel.touchMode);
     _virtualMouseScale = double.tryParse(
             bind.mainGetLocalOption(key: kOptionVirtualMouseScale)) ??
         1.0;

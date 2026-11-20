@@ -410,7 +410,7 @@ String _controlHint(String mode) {
     case 'trackpad':
       return '屏幕当触控板用，单指移动箭头，轻点＝左键，长按＝右键。$common';
     default:
-      return '屏幕当触控板用，单指移动箭头，屏幕上另有左键、右键和滚轮按钮。$common';
+      return '屏幕上有一个鼠标，按住它拖动来移动箭头，点它的左键、右键，按滚轮来滚动。一会儿不用它会自动缩小，点一下就展开。$common';
   }
 }
 
@@ -436,11 +436,9 @@ class _SettingsTabState extends State<_SettingsTab> {
     _accel = trackpadAccelProfileFromString(
         bind.mainGetLocalOption(key: kOptionTrackpadAccel));
     _quality = bind.mainGetUserDefaultOption(key: kOptionImageQuality);
-    final touch = bind.mainGetLocalOption(key: kOptionTouchMode) == 'Y';
+    final touch = bind.mainGetLocalOption(key: kOptionTouchMode) != 'N';
     final vm = bind.mainGetLocalOption(key: kOptionShowVirtualMouse);
-    _control = touch
-        ? 'touch'
-        : (vm == 'N' ? 'trackpad' : 'mouse');
+    _control = touch ? (vm == 'N' ? 'touch' : 'mouse') : 'trackpad';
     bind.mainGetVersion().then((v) {
       if (mounted) setState(() => _version = v);
     });
@@ -512,7 +510,7 @@ class _SettingsTabState extends State<_SettingsTab> {
             ], _control, (v) {
               setState(() => _control = v);
               bind.mainSetLocalOption(
-                  key: kOptionTouchMode, value: v == 'touch' ? 'Y' : 'N');
+                  key: kOptionTouchMode, value: v == 'trackpad' ? 'N' : 'Y');
               bind.mainSetLocalOption(
                   key: kOptionShowVirtualMouse,
                   value: v == 'mouse' ? 'Y' : 'N');
