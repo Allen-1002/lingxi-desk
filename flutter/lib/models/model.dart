@@ -2022,11 +2022,22 @@ class ImageModel with ChangeNotifier {
   }
 
   // mobile only
+  // Lingxi Desk: the canvas scale is in display pixels, and a frame shrunk
+  // by the computer is smaller than the display, so measure the display.
+  (double, double) get _contentSize {
+    final rect = parent.target?.ffiModel.rect;
+    if (rect != null && rect.width > 0 && rect.height > 0) {
+      return (rect.width, rect.height);
+    }
+    return (_image!.width.toDouble(), _image!.height.toDouble());
+  }
+
   double get maxScale {
     if (_image == null) return 1.5;
     final size = parent.target!.canvasModel.getSize();
-    final xscale = size.width / _image!.width;
-    final yscale = size.height / _image!.height;
+    final (w, h) = _contentSize;
+    final xscale = size.width / w;
+    final yscale = size.height / h;
     return max(1.5, max(xscale, yscale));
   }
 
@@ -2034,8 +2045,9 @@ class ImageModel with ChangeNotifier {
   double get minScale {
     if (_image == null) return 1.5;
     final size = parent.target!.canvasModel.getSize();
-    final xscale = size.width / _image!.width;
-    final yscale = size.height / _image!.height;
+    final (w, h) = _contentSize;
+    final xscale = size.width / w;
+    final yscale = size.height / h;
     return min(xscale, yscale) / 1.5;
   }
 

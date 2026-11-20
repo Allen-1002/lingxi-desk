@@ -551,9 +551,11 @@ class _RawTouchGestureDetectorRegionState
       // mobile
       if (_twoFingerMode == _kTwoUndecided) {
         _twoFingerTravel += d.focalPointDelta;
-        if ((d.scale - 1).abs() > 0.08) {
+        // Fingers held for a scroll still drift apart a little, so a pinch
+        // must clearly change the spread before the pair moves 10 px.
+        if ((d.scale - 1).abs() > 0.18) {
           _twoFingerMode = _kTwoZoom;
-        } else if (_twoFingerTravel.distance > 12) {
+        } else if (_twoFingerTravel.distance > 10) {
           _twoFingerMode = _kTwoScroll;
           _twoFingerScrollAcc = _twoFingerTravel.dy;
         } else {
