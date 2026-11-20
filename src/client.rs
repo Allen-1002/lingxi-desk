@@ -466,6 +466,23 @@ impl Client {
             ));
         }
 
+        // Lingxi Desk: a device seen on the LAN (or paired with a known LAN
+        // address) is tried directly first, so no server is needed at home.
+        for ip in lan_addresses_for(peer) {
+            let addr = check_port(&ip, RELAY_PORT + 1);
+            match connect_tcp_local(addr.as_str(), None, LAN_DIRECT_TIMEOUT_MS).await {
+                Ok(stream) => {
+                    log::info!("LAN direct connection to {} via {}", peer, addr);
+                    return Ok((
+                        (stream, true, None, None, "TCP"),
+                        (0, "".to_owned()),
+                        false,
+                    ));
+                }
+                Err(err) => log::info!("LAN direct {} failed: {}", addr, err),
+            }
+        }
+
         let other_server = interface.get_lch().read().unwrap().other_server.clone();
         let (peer, other_server, key, token) = if let Some((a, b, c)) = other_server.as_ref() {
             (a.as_ref(), b.as_ref(), c.as_ref(), "")
@@ -5936,4 +5953,29 @@ mod kx_tests {
         assert_eq!(seen.picked, 1);
         assert!(!seen.decrypted && !decrypted);
     }
+}
+
+/// Lingxi Desk: how long one LAN direct attempt may take before falling back.
+const LAN_DIRECT_TIMEOUT_MS: u64 = 1500;
+
+/// Lingxi Desk: LAN addresses for a device id, from LAN discovery and from the
+/// address remembered when the device was paired (`lingxi-ip-<id>`).
+fn lan_addresses_for(id: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for p in config::LanPeers::load().peers {
+        if p.id == id {
+            for ip in p.ip_mac.keys() {
+                if !out.contains(ip) {
+                    out.push(ip.clone());
+                }
+            }
+        }
+    }
+    let saved = config::LocalConfig::get_option(&format!("lingxi-ip-{}", id));
+    for ip in saved.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if hbb_common::is_ip_str(ip) && !out.iter().any(|x| x == ip) {
+            out.push(ip.to_owned());
+        }
+    }
+    out
 }

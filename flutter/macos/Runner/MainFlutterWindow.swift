@@ -55,6 +55,29 @@ class MainFlutterWindow: NSWindow {
         )
     }
 
+    /// Lingxi Desk: frosted-glass main window. The Flutter view is made
+    /// transparent and a behind-window NSVisualEffectView fills the frame,
+    /// so the system blur shows through wherever Flutter paints nothing.
+    private func applyLingxiVibrancy(_ controller: FlutterViewController) {
+        if #available(macOS 10.14, *) {
+            controller.backgroundColor = .clear
+        }
+        self.isOpaque = false
+        self.backgroundColor = .clear
+        self.titlebarAppearsTransparent = true
+        self.styleMask.insert(.fullSizeContentView)
+        guard let flutterView = controller.view as NSView?,
+              let frameView = flutterView.superview else {
+            return
+        }
+        let effect = NSVisualEffectView(frame: frameView.bounds)
+        effect.autoresizingMask = [.width, .height]
+        effect.blendingMode = .behindWindow
+        effect.material = .sidebar
+        effect.state = .followsWindowActiveState
+        frameView.addSubview(effect, positioned: .below, relativeTo: flutterView)
+    }
+
     override func awakeFromNib() {
         rustdesk_core_main();
         _ = MainFlutterWindow.fullscreenObserver
@@ -62,6 +85,7 @@ class MainFlutterWindow: NSWindow {
         let windowFrame = self.frame
         self.contentViewController = flutterViewController
         self.setFrame(windowFrame, display: true)
+        applyLingxiVibrancy(flutterViewController)
         // register self method handler
         let registrar = flutterViewController.registrar(forPlugin: "RustDeskPlugin")
         setMethodHandler(registrar: registrar)

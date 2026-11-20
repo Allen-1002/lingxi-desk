@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/lingxi/lingxi_desktop_home.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
@@ -91,6 +92,13 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Lingxi Desk: the main window is our own home, not upstream's tabs.
+    return const LingxiDesktopHome();
+  }
+
+  // Upstream tabbed home, kept for reference while the rewrite settles.
+  // ignore: unused_element
+  Widget _buildUpstream(BuildContext context) {
     final tabWidget = Container(
         child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.background,
