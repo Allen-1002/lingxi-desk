@@ -396,9 +396,10 @@ impl Client {
                 // Lingxi Desk: say plainly that the server could not be reached.
                 if let Some(rest) = err_str.strip_prefix("Failed to connect to ") {
                     let addr = rest.split(": ").next().unwrap_or(rest);
-                    if !addr.contains(' ') {
+                    let addr = addr.rsplit_once(':').map(|(h, _)| h).unwrap_or(addr);
+                    if !addr.is_empty() && !addr.contains(' ') {
                         bail!(
-                            "连不上服务器 {addr}。请检查网络，以及服务器的防火墙是否放行了 21115-21119 端口（含 UDP 21116）。"
+                            "连不上服务器 {addr}\n请检查网络，以及服务器的防火墙是否放行了 21115-21119 端口（含 UDP 21116）。"
                         );
                     }
                 }
