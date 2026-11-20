@@ -5,7 +5,6 @@
 // is the real system blur and these panels sit on top of it. Elsewhere we
 // paint an aurora gradient and blur it inside each glass panel.
 
-import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -39,14 +38,10 @@ class LxColors {
       : const Color(0xFF12141C).withOpacity(0.05);
 }
 
-/// True when the native window already provides the blur (macOS desktop).
-bool get lxNativeVibrancy {
-  try {
-    return Platform.isMacOS;
-  } catch (_) {
-    return false;
-  }
-}
+/// True when the native window already provides the blur. Off for now: the
+/// behind-window NSVisualEffectView swallowed input on macOS, so every
+/// platform draws the aurora background and blurs it in Flutter.
+const bool lxNativeVibrancy = false;
 
 /// Full-screen aurora background. Transparent on macOS desktop so the native
 /// vibrancy shows through.

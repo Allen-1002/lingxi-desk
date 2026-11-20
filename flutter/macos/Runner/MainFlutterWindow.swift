@@ -55,34 +55,6 @@ class MainFlutterWindow: NSWindow {
         )
     }
 
-    /// Lingxi Desk: frosted-glass main window. Only the main window gets it:
-    /// the same executable also runs the connection manager popup (`--cm`)
-    /// and other helper modes, which must stay ordinary opaque windows.
-    /// The window style is left alone (upstream already hides the title bar
-    /// and draws its own); we only make the Flutter view transparent and put
-    /// a behind-window blur view underneath it.
-    private func applyLingxiVibrancy(_ controller: FlutterViewController) {
-        let args = CommandLine.arguments.dropFirst()
-        if args.contains(where: { $0.hasPrefix("--") }) {
-            return
-        }
-        guard let flutterView = controller.view as NSView?,
-              let frameView = flutterView.superview else {
-            return
-        }
-        if #available(macOS 10.14, *) {
-            controller.backgroundColor = .clear
-        }
-        self.isOpaque = false
-        self.backgroundColor = .clear
-        let effect = NSVisualEffectView(frame: frameView.bounds)
-        effect.autoresizingMask = [.width, .height]
-        effect.blendingMode = .behindWindow
-        effect.material = .sidebar
-        effect.state = .followsWindowActiveState
-        frameView.addSubview(effect, positioned: .below, relativeTo: flutterView)
-    }
-
     override func awakeFromNib() {
         rustdesk_core_main();
         _ = MainFlutterWindow.fullscreenObserver
@@ -90,7 +62,8 @@ class MainFlutterWindow: NSWindow {
         let windowFrame = self.frame
         self.contentViewController = flutterViewController
         self.setFrame(windowFrame, display: true)
-        applyLingxiVibrancy(flutterViewController)
+        // Lingxi Desk: native vibrancy disabled for now (it covered the
+        // window and swallowed all input); the glass look is drawn in Flutter.
         // register self method handler
         let registrar = flutterViewController.registrar(forPlugin: "RustDeskPlugin")
         setMethodHandler(registrar: registrar)
