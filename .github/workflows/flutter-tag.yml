@@ -1,13 +1,10 @@
 name: Flutter Tag Build
 
+# Lingxi releases (vX.Y.Z) are built and published by res/lingxi/release-android.sh,
+# so a version tag must not start upstream's full build, which would upload its
+# rustdesk-* packages into the same release. Run it by hand if needed.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
 
 jobs:
   run-flutter-tag-build:
