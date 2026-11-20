@@ -12,6 +12,7 @@ import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/input_model.dart';
 
 import './gestures.dart';
+import './trackpad_ballistics.dart';
 
 class RawKeyFocusScope extends StatelessWidget {
   final FocusNode? focusNode;
@@ -110,6 +111,29 @@ class _RawTouchGestureDetectorRegionState
   // Cache global position for onTap (which lacks position info).
   Offset? _lastTapDownGlobalPosition;
 
+  // Lingxi Desk: acceleration curve + sensitivity for mobile mouse mode.
+  final TrackpadBallistics _ballistics = TrackpadBallistics();
+  final Stopwatch _panClock = Stopwatch()..start();
+  // Finger-down position of the current pan; the first update measures from
+  // here so movement inside the gesture slop is not lost.
+  Offset? _panOrigin;
+  Offset? _lastPointerDown;
+
+  void _loadBallisticsOptions() {
+    final s = double.tryParse(
+            bind.mainGetLocalOption(key: kOptionTrackpadSensitivity)) ??
+        1.0;
+    _ballistics.sensitivity = s;
+    _ballistics.profile = trackpadAccelProfileFromString(
+        bind.mainGetLocalOption(key: kOptionTrackpadAccel));
+  }
+
+  Offset _applyBallistics(Offset delta) {
+    final (dx, dy) = _ballistics.transform(
+        delta.dx, delta.dy, _panClock.elapsedMicroseconds);
+    return Offset(dx, dy);
+  }
+
   FFI get ffi => widget.ffi;
   FfiModel get ffiModel => widget.ffiModel;
   InputModel get inputModel => widget.inputModel;
@@ -119,9 +143,15 @@ class _RawTouchGestureDetectorRegionState
 
   @override
   Widget build(BuildContext context) {
-    return RawGestureDetector(
-      child: widget.child,
-      gestures: makeGestures(context),
+    return Listener(
+      // Lingxi Desk: remember where the finger went down so the first pan
+      // update can include the distance swallowed by the gesture slop.
+      onPointerDown: (e) => _lastPointerDown = e.localPosition,
+      behavior: HitTestBehavior.translucent,
+      child: RawGestureDetector(
+        child: widget.child,
+        gestures: makeGestures(context),
+      ),
     );
   }
 
@@ -392,6 +422,14 @@ class _RawTouchGestureDetectorRegionState
       }
       await ffi.cursorModel.move(d.localPosition.dx, d.localPosition.dy);
     } else {
+      // Lingxi Desk: a new pan starts with fresh ballistics, and the distance
+      // the finger travelled inside the gesture slop is replayed on the first
+      // update instead of being swallowed. Set before any `await`: the first
+      // update is dispatched synchronously right after this callback.
+      _loadBallisticsOptions();
+      _ballistics.reset();
+      _panOrigin = _lastPointerDown;
+      _lastPointerDown = null;
       final offset = ffi.cursorModel.offset;
       final cursorX = offset.dx;
       final cursorY = offset.dy;
@@ -417,8 +455,20 @@ class _RawTouchGestureDetectorRegionState
     // In relative mouse mode, send delta directly without position tracking.
     if (inputModel.relativeMouseMode.value) {
       await inputModel.sendMobileRelativeMouseMove(d.delta.dx, d.delta.dy);
-    } else {
+    } else if (handleTouch) {
       await ffi.cursorModel.updatePan(d.delta, d.localPosition, handleTouch);
+    } else {
+      // Lingxi Desk: mouse (trackpad) mode goes through the gain curve.
+      var delta = d.delta;
+      final origin = _panOrigin;
+      _panOrigin = null;
+      if (origin != null) {
+        final fromDown = d.localPosition - origin;
+        // Sanity bound: the slop is a few dozen logical px at most.
+        if (fromDown.distance < 80) delta = fromDown;
+      }
+      await ffi.cursorModel
+          .updatePan(_applyBallistics(delta), d.localPosition, handleTouch);
     }
   }
 

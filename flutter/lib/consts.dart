@@ -150,6 +150,9 @@ const String kOptionDisableClipboard = "disable_clipboard";
 const String kOptionLockAfterSessionEnd = "lock_after_session_end";
 const String kOptionPrivacyMode = "privacy_mode";
 const String kOptionTouchMode = "touch-mode";
+// Lingxi Desk: mobile trackpad (mouse mode) ballistics.
+const String kOptionTrackpadSensitivity = "lingxi-trackpad-sensitivity";
+const String kOptionTrackpadAccel = "lingxi-trackpad-accel";
 const String kOptionI444 = "i444";
 const String kOptionSwapLeftRightMouse = "swap-left-right-mouse";
 const String kOptionCodecPreference = "codec-preference";

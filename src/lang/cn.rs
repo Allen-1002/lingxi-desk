@@ -826,5 +826,11 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("install-directory-not-empty-tip", "所选文件夹不为空。安装可能删除现有数据。建议选择其他文件夹。"),
         ("Request approval", "请求批准"),
         ("Forever", "永久"),
+        ("Pointer speed", "指针速度"),
+        ("Pointer acceleration", "指针加速"),
+        ("accel-off", "关"),
+        ("accel-light", "轻"),
+        ("accel-medium", "中"),
+        ("accel-strong", "强"),
     ].iter().cloned().collect();
 }

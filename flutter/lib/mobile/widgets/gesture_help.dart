@@ -1,5 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/widgets/trackpad_ballistics.dart';
+import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/input_model.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:get/get.dart';
@@ -71,6 +75,69 @@ class _GestureHelpState extends State<GestureHelp> {
     if (condition) {
       widget.inputModel?.setRelativeMouseMode(false);
     }
+  }
+
+  late double _trackpadSensitivity = double.tryParse(
+          bind.mainGetLocalOption(key: kOptionTrackpadSensitivity)) ??
+      1.0;
+  late TrackpadAccelProfile _trackpadAccel = trackpadAccelProfileFromString(
+      bind.mainGetLocalOption(key: kOptionTrackpadAccel));
+
+  Widget _buildTrackpadSettings(BuildContext context) {
+    const profiles = TrackpadAccelProfile.values;
+    return SizedBox(
+      width: 300,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          Text(
+              '${translate('Pointer speed')}: ${_trackpadSensitivity.toStringAsFixed(1)}x'),
+          Slider(
+            // 0.2x - 5x on a log scale so 1x sits in the middle.
+            value: log(_trackpadSensitivity) / ln10,
+            min: log(TrackpadBallistics.minSensitivity) / ln10,
+            max: log(TrackpadBallistics.maxSensitivity) / ln10,
+            onChanged: (v) {
+              setState(() {
+                _trackpadSensitivity =
+                    (pow(10, v).toDouble() * 10).roundToDouble() / 10;
+              });
+            },
+            onChangeEnd: (_) => bind.mainSetLocalOption(
+                key: kOptionTrackpadSensitivity,
+                value: _trackpadSensitivity.toString()),
+          ),
+          Text(translate('Pointer acceleration')),
+          const SizedBox(height: 6),
+          ToggleSwitch(
+            initialLabelIndex: profiles.indexOf(_trackpadAccel),
+            activeFgColor: Colors.white,
+            inactiveFgColor: Colors.white60,
+            activeBgColor: [MyTheme.accent],
+            inactiveBgColor: Theme.of(context).hintColor,
+            totalSwitches: profiles.length,
+            minWidth: 70,
+            fontSize: 13,
+            labels: [
+              translate('accel-off'),
+              translate('accel-light'),
+              translate('accel-medium'),
+              translate('accel-strong'),
+            ],
+            onToggle: (index) {
+              if (index == null) return;
+              setState(() => _trackpadAccel = profiles[index]);
+              bind.mainSetLocalOption(
+                  key: kOptionTrackpadAccel,
+                  value: trackpadAccelProfileToString(_trackpadAccel));
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 
   @override
@@ -150,6 +217,9 @@ class _GestureHelpState extends State<GestureHelp> {
                           ],
                         ),
                       ),
+                      // Lingxi Desk: pointer speed and acceleration for
+                      // mouse (trackpad) mode.
+                      if (!_touchMode) _buildTrackpadSettings(context),
                       if (_touchMode && _virtualMouseMode.showVirtualMouse)
                         Padding(
                           // Indent "Virtual mouse size"
