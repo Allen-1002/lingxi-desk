@@ -110,7 +110,7 @@ portable-pty = { git = "https://github.com/rustdesk-org/wezterm", branch = "rust
 system_shutdown = "4.0"
 qrcode-generator = "4.1"
 # Lingxi: one-click server deploy over SSH (desktop only). 0.54 is the last line with MSRV 1.75.
-russh = { version = "=0.54.6", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh = { version = "=0.54.5", default-features = false, features = ["ring", "flate2", "rsa"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = [
