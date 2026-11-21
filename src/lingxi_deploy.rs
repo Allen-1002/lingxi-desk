@@ -341,6 +341,8 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
   echo "已在 firewalld 防火墙放行端口"
 fi
 for i in $(seq 1 30); do [ -s "$D/data/id_ed25519.pub" ] && break; sleep 0.5; done
+# hbbs writes its private key world-readable; keep it to the service user.
+[ -f "$D/data/id_ed25519" ] && chmod 600 "$D/data/id_ed25519"
 rm -f /tmp/lingxi-server.tgz /tmp/lingxi-server-install.sh
 systemctl is-active --quiet lingxi-hbbs || { echo "hbbs 没有启动成功" >&2; journalctl -u lingxi-hbbs -n 20 --no-pager >&2; exit 4; }
 systemctl is-active --quiet lingxi-hbbr || { echo "hbbr 没有启动成功" >&2; journalctl -u lingxi-hbbr -n 20 --no-pager >&2; exit 4; }
