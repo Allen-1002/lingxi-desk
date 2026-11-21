@@ -24,6 +24,8 @@ for pair in amd64:amd64 arm64:arm64v8; do
   dir="$(dirname "$(find "$TMP/$arch" -type f -name hbbs | head -1)")"
   [[ -x "$dir/hbbs" || -f "$dir/hbbs" ]] || { echo "hbbs not found in $up zip" >&2; exit 1; }
   chmod 755 "$dir/hbbs" "$dir/hbbr"
-  tar czf "$dst" -C "$dir" hbbs hbbr
+  # --no-xattrs: macOS tar would otherwise add LIBARCHIVE.xattr headers that GNU tar
+  # on the server prints warnings about.
+  COPYFILE_DISABLE=1 tar --no-xattrs -czf "$dst" -C "$dir" hbbs hbbr
   echo "made $dst ($(du -h "$dst" | cut -f1))"
 done
