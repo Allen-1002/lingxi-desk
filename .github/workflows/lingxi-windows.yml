@@ -107,6 +107,11 @@ jobs:
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
           mv ./flutter/build/windows/x64/runner/Release ./LingxiDesk
 
+      - name: Add server programs for one-click deploy
+        shell: bash
+        run: |
+          res/lingxi/fetch-server-bins.sh LingxiDesk/lingxi-server
+
       - name: Zip and attach to the release
         shell: bash
         env:

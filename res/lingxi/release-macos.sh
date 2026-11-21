@@ -27,6 +27,11 @@ TAG="v$VER"
 APPVER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
 [[ "$APPVER" == "$VER" ]] || { echo "app version $APPVER != pubspec $VER; rebuild" >&2; exit 1; }
 
+# Server programs for one-click server deploy (Settings > 连接 > 部署服务器).
+res/lingxi/fetch-server-bins.sh flutter/build/lingxi-server
+mkdir -p "$APP/Contents/Resources/lingxi-server"
+cp flutter/build/lingxi-server/lingxi-server-linux-*.tar.gz "$APP/Contents/Resources/lingxi-server/"
+
 "$SIGN" "$APP"
 codesign --verify --deep --strict "$APP"
 codesign -dv --verbose=2 "$APP" 2>&1 | grep -E "Identifier|TeamIdentifier"

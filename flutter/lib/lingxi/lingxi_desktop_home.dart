@@ -478,6 +478,7 @@ class _DesktopSettings extends StatefulWidget {
 }
 
 class _DesktopSettingsState extends State<_DesktopSettings> {
+  int _serverRev = 0;
   late bool _lanDirect;
   late String _quality;
   String _version = '';
@@ -558,7 +559,17 @@ class _DesktopSettingsState extends State<_DesktopSettings> {
         ),
         const SizedBox(height: 18),
         const LxSectionTitle('连接'),
-        const Glass(child: LxServerTile()),
+        Glass(
+          child: Column(children: [
+            LxServerTile(key: ValueKey(_serverRev)),
+            if (lxCanDeployServer) ...[
+              const SizedBox(height: 10),
+              Divider(height: 1, color: LxColors.hairline(context)),
+              const SizedBox(height: 10),
+              LxDeployServerTile(onDone: () => setState(() => _serverRev++)),
+            ],
+          ]),
+        ),
         const SizedBox(height: 18),
         const LxSectionTitle('关于'),
         Glass(
