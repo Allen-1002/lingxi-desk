@@ -332,8 +332,10 @@ impl RendezvousMediator {
         });
         #[cfg(target_os = "android")]
         let start_lan_listening = true;
+        // Lingxi Desk: answer LAN discovery even when not installed, so the
+        // portable Windows build is found by phones and computers nearby.
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        let start_lan_listening = crate::platform::is_installed();
+        let start_lan_listening = true;
         if start_lan_listening {
             std::thread::spawn(move || {
                 allow_err!(super::lan::start_listening());
