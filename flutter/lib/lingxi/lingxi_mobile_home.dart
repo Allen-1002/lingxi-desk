@@ -145,9 +145,12 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
                     color: LxColors.text(context))),
             const Spacer(),
             Material(
-              color: Colors.transparent,
+              type: MaterialType.transparency,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.none,
               child: InkWell(
                 customBorder: const CircleBorder(),
+                highlightColor: Colors.transparent,
                 onTap: () => _showAdd(context),
                 child: Ink(
                   width: 44,
