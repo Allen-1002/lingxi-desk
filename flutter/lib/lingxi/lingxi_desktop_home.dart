@@ -52,6 +52,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
     windowManager.addListener(this);
     gFFI.lanPeersModel.addListener(_changed);
     gFFI.recentPeersModel.addListener(_changed);
+    lxDevicesChanged.addListener(_changed);
     lxRefreshDevices();
     lxEnsureSelfPairKey().then((k) {
       if (mounted) setState(() => _pairKey = k);
@@ -70,6 +71,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
     _timer?.cancel();
     gFFI.lanPeersModel.removeListener(_changed);
     gFFI.recentPeersModel.removeListener(_changed);
+    lxDevicesChanged.removeListener(_changed);
     super.dispose();
   }
 

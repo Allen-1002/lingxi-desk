@@ -32,6 +32,7 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
     super.initState();
     gFFI.lanPeersModel.addListener(_changed);
     gFFI.recentPeersModel.addListener(_changed);
+    lxDevicesChanged.addListener(_changed);
     lxRefreshDevices();
     _timer = Timer.periodic(const Duration(seconds: 8), (_) => lxRefreshDevices());
     LxUpdater.instance.check();
@@ -42,6 +43,7 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
     _timer?.cancel();
     gFFI.lanPeersModel.removeListener(_changed);
     gFFI.recentPeersModel.removeListener(_changed);
+    lxDevicesChanged.removeListener(_changed);
     super.dispose();
   }
 
@@ -97,9 +99,22 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
     final bottom = MediaQuery.of(context).padding.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, math.max(bottom, 12)),
-      child: Glass(
-        radius: 24,
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: LxColors.isDark(context)
+              ? const Color(0xFF1B1D26)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: LxColors.hairline(context)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black
+                    .withOpacity(LxColors.isDark(context) ? 0.4 : 0.10),
+                blurRadius: 24,
+                offset: const Offset(0, 8)),
+          ],
+        ),
         child: Row(children: [
           item(0, Icons.devices_rounded, '设备'),
           item(1, Icons.tune_rounded, '设置'),
@@ -129,15 +144,33 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
                     fontWeight: FontWeight.w700,
                     color: LxColors.text(context))),
             const Spacer(),
-            SizedBox(
-              width: 44,
-              height: 44,
-              child: IconButton.filled(
-                tooltip: '添加设备',
-                style: IconButton.styleFrom(backgroundColor: LxColors.indigoDeep),
-                onPressed: () => _showAdd(context),
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => _showAdd(context),
+                child: Ink(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [LxColors.indigo, LxColors.indigoDeep],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: LxColors.indigo.withOpacity(0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: const Icon(Icons.add_rounded,
+                      color: Colors.white, size: 26, semanticLabel: '添加设备'),
+                ),
               ),
+            ),
             ),
           ]),
           const SizedBox(height: 20),

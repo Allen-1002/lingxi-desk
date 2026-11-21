@@ -70,7 +70,7 @@ List<LxDevice> lxCollectDevices(String selfId) {
       id: p.id,
       name: _nameFor(p),
       platform: p.platform,
-      online: p.online,
+      online: p.online || _serverOnline.contains(p.id),
       onLan: false,
       paired: lxPairKeyFor(p.id).isNotEmpty,
     );
@@ -84,10 +84,42 @@ List<LxDevice> lxCollectDevices(String selfId) {
   return list;
 }
 
+/// Device ids the server last reported online / offline. Kept here rather than
+/// on the peer objects, which are replaced every time the list reloads.
+final Set<String> _serverOnline = {};
+
+/// Bumped when the server's online answer arrives.
+final lxDevicesChanged = ValueNotifier<int>(0);
+bool _onlineHandlerSet = false;
+
 void lxRefreshDevices() {
   bind.mainDiscover();
   bind.mainLoadLanPeers();
   bind.mainLoadRecentPeers();
+  _queryServerOnline();
+}
+
+/// Ask the server which known devices are online, so a device away from the
+/// local network still shows as online.
+void _queryServerOnline() {
+  if (!_onlineHandlerSet) {
+    _onlineHandlerSet = true;
+    platformFFI.registerEventHandler('callback_query_onlines', 'lingxi',
+        (evt) async {
+      for (final id in '${evt['onlines'] ?? ''}'.split(',')) {
+        if (id.isNotEmpty) _serverOnline.add(id);
+      }
+      for (final id in '${evt['offlines'] ?? ''}'.split(',')) {
+        _serverOnline.remove(id);
+      }
+      lxDevicesChanged.value++;
+    });
+  }
+  final ids = gFFI.recentPeersModel.peers
+      .map((p) => p.id)
+      .where((id) => id.isNotEmpty)
+      .toList();
+  if (ids.isNotEmpty) bind.queryOnlines(ids: ids);
 }
 
 /// Connect to a device by its six-digit code; paired devices log in with
