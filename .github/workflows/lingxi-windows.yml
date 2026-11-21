@@ -25,7 +25,10 @@ env:
   TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
+  # Only app releases (vX.Y.Z) get a Windows build; other releases in this repo,
+  # e.g. the server-programs pre-release "server-1.1.16", are skipped.
   generate-bridge:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v')
     uses: ./.github/workflows/bridge.yml
 
   build-windows-x64:
