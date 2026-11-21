@@ -22,7 +22,7 @@ import '../common.dart';
 import 'lingxi_theme.dart';
 
 const _kOwner = 'Allen-1002';
-const _kRepo = 'lingxi-desk';
+const _kRepo = 'nimbo';
 const _kLatestUrl =
     'https://api.github.com/repos/$_kOwner/$_kRepo/releases/latest';
 const kLxReleasesPage = 'https://github.com/$_kOwner/$_kRepo/releases';
