@@ -93,6 +93,7 @@
 - [ ] 自建服务器：设备组、跨用户连接授权（每次需对方同意，可设免确认）
 - [x] Windows 被控端安装包（测试版）、Mac 和 Windows 应用内更新
 - [x] 在设置里填自己的服务器，扫码配对时手机自动同步
+- [x] 电脑端一键部署服务器（SSH，无需 Docker）
 
 完整技术方案见 [docs/design.md](docs/design.md)，每个版本的改动见 [CHANGELOG.md](CHANGELOG.md)。
 
