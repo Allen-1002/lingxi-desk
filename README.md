@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="res/lingxi/icon.svg" width="120" alt="灵犀图标">
+  <img src="res/lingxi/icon.svg" width="120" alt="Nimbo icon">
 </p>
 
-<h1 align="center">灵犀 Lingxi Desk</h1>
+<h1 align="center">Nimbo</h1>
 
 <p align="center">
   自建服务器的跨端远程桌面：用手机或电脑，控制家里和办公室的 Windows / Mac。<br>
-  心有灵犀一点通：配对一次，以后点一下就连上，不用密码。
+  配对一次，以后点一下就连上，不用密码。
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/Allen-1002/lingxi-desk?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC"></a>
+  <a href="../../releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/Allen-1002/nimbo?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC"></a>
   <a href="LICENSE"><img alt="许可" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
   <img alt="平台" src="https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Android%20%7C%20macOS%20%7C%20Windows-4F46E5">
 </p>
@@ -40,10 +40,12 @@
 
 所有安装包都在 [Releases](../../releases) 页面。
 
+> 安装包文件名暂时还叫 `LingxiDesk-…`（Nimbo 以前叫灵犀），这样老版本也能自动更新。
+
 ### Android
 
 1. 下载 `LingxiDesk-<版本>-android-arm64.apk`，打开安装（第一次需要允许浏览器或文件管理器“安装未知应用”）。
-2. 以后有新版本时，打开灵犀会在首页提示，或者在「设置 > 关于」里点「检查更新」，一键下载安装。
+2. 以后有新版本时，打开 Nimbo 会在首页提示，或者在「设置 > 关于」里点「检查更新」，一键下载安装。
 
 > 只要一直用 Releases 里的安装包，就能原地更新，不用卸载重装。
 
@@ -64,8 +66,8 @@
 
 ## 怎么用
 
-1. **电脑上**打开灵犀，首页有 6 位设备码和一个二维码。
-2. **手机上**打开灵犀，点右上角「+」→「扫码配对」，扫电脑上的二维码。
+1. **电脑上**打开 Nimbo，首页有 6 位设备码和一个二维码。
+2. **手机上**打开 Nimbo，点右上角「+」→「扫码配对」，扫电脑上的二维码。
 3. 配对好的电脑会出现在「我的设备」里，点一下就能连接。
 
 只想临时连一次的话，也可以在手机上输入电脑的 6 位设备码，电脑那边点「接受」即可。
@@ -84,7 +86,7 @@
 
 ## 路线图
 
-- [x] 改名换标，换成灵犀自己的界面（磨砂玻璃风格）
+- [x] 换成自己的界面（磨砂玻璃风格），改名 Nimbo
 - [x] 6 位设备码、扫码配对免密码、局域网直连
 - [x] 手机端虚拟鼠标、触控板加速曲线、触控板式手势
 - [x] 安卓应用内一键更新
@@ -99,7 +101,7 @@
 
 ## 从源码构建
 
-灵犀基于 RustDesk 1.5.3（Rust + Flutter）。构建环境和 RustDesk 一致，参考 [RustDesk 的构建文档](https://rustdesk.com/docs/en/dev/build/)。
+Nimbo 基于 RustDesk 1.5.3（Rust + Flutter）。构建环境和 RustDesk 一致，参考 [RustDesk 的构建文档](https://rustdesk.com/docs/en/dev/build/)。
 
 - 安卓发布包：`res/lingxi/release-android.sh <更新说明.md>`。发布前先把 `flutter/pubspec.yaml` 里的版本号（名称和 `+` 后的构建号）各加一，并且每次都用同一把签名密钥，否则手机无法原地更新。
 - 图标：`res/lingxi/make_icons.py` 生成各平台图标。

@@ -1,4 +1,4 @@
-// Lingxi Desk visual language: soft aurora background, frosted glass panels.
+// Nimbo visual language: soft aurora background, frosted glass panels.
 //
 // On macOS the main window is made translucent natively (NSVisualEffectView,
 // see macos/Runner/MainFlutterWindow.swift), so the desktop background there
@@ -9,6 +9,9 @@ import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+
+/// Display name of the app, in one place so a rename touches one line.
+const String kLxAppName = 'Nimbo';
 
 class LxColors {
   static const indigo = Color(0xFF4F46E5);
@@ -157,7 +160,7 @@ class Glass extends StatelessWidget {
   }
 }
 
-/// The app mark: two arcs holding one point (心有灵犀一点通).
+/// The app mark: a white cloud on the teal-to-indigo tile (Nimbo).
 class LxLogo extends StatelessWidget {
   final double size;
   const LxLogo({super.key, this.size = 32});
@@ -184,23 +187,21 @@ class _LogoPainter extends CustomPainter {
           colors: [LxColors.teal, LxColors.indigo],
         ).createShader(Offset.zero & s),
     );
-    final u = s.width / 100;
-    final stroke = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8 * u
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(
-        Path()
-          ..moveTo(38.8 * u, 77.2 * u)
-          ..quadraticBezierTo(18 * u, 50 * u, 43.6 * u, 42 * u),
-        stroke);
-    canvas.drawPath(
-        Path()
-          ..moveTo(61.2 * u, 77.2 * u)
-          ..quadraticBezierTo(82 * u, 50 * u, 56.4 * u, 42 * u),
-        stroke);
-    canvas.drawCircle(Offset(50 * u, 30 * u), 6.4 * u, Paint()..color = Colors.white);
+    // Same drawing as res/lingxi/make_icons.py: glyph box is 80% of the tile.
+    final g = s.width * 0.8, o = s.width * 0.1, oy = s.width * 0.12;
+    final white = Paint()..color = Colors.white;
+    const dy = 0.03;
+    for (final (cx, cy, rr) in const [
+      (0.33, 0.56 + dy, 0.17),
+      (0.54, 0.44 + dy, 0.22),
+      (0.72, 0.58 + dy, 0.15),
+    ]) {
+      canvas.drawCircle(Offset(o + cx * g, oy + cy * g), rr * g, white);
+    }
+    canvas.drawRRect(
+        RRect.fromLTRBR(o + 0.16 * g, oy + (0.55 + dy) * g, o + 0.87 * g,
+            oy + (0.73 + dy) * g, Radius.circular(0.09 * g)),
+        white);
   }
 
   @override
@@ -279,5 +280,288 @@ class LxSectionTitle extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: LxColors.subtext(context))),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Settings building blocks: grouped cards of rows, like system settings.
+
+/// Large page title with an optional line under it.
+class LxPageHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  const LxPageHeader(this.title, {super.key, this.subtitle});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style: TextStyle(
+                  fontSize: 28,
+                  height: 1.15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                  color: LxColors.text(context))),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(subtitle!,
+                style: TextStyle(fontSize: 14, color: LxColors.subtext(context))),
+          ],
+        ]),
+      );
+}
+
+/// A titled card holding [children] separated by inset hairlines.
+class LxGroup extends StatelessWidget {
+  final String? title;
+  final String? footer;
+  final List<Widget> children;
+  const LxGroup({super.key, this.title, this.footer, required this.children});
+
+  static Color fill(BuildContext c) => LxColors.isDark(c)
+      ? const Color(0xFF1B1D26).withOpacity(lxCheapGlass ? 0.92 : 0.72)
+      : Colors.white.withOpacity(lxCheapGlass ? 0.90 : 0.74);
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) {
+        rows.add(Padding(
+          padding: const EdgeInsets.only(left: 60),
+          child: Divider(height: 1, thickness: 1, color: LxColors.hairline(context)),
+        ));
+      }
+      rows.add(children[i]);
+    }
+    final card = Container(
+      decoration: BoxDecoration(
+        color: fill(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: LxColors.hairline(context)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(LxColors.isDark(context) ? 0.25 : 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 6)),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: rows),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (title != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+            child: Text(title!.toUpperCase(),
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                    color: LxColors.subtext(context))),
+          ),
+        card,
+        if (footer != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+            child: Text(footer!,
+                style: TextStyle(
+                    fontSize: 12.5, height: 1.45, color: LxColors.subtext(context))),
+          ),
+      ]),
+    );
+  }
+}
+
+/// Rounded tinted square with an icon, used at the start of a row.
+class LxIconBadge extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final double size;
+  const LxIconBadge(this.icon, this.color, {super.key, this.size = 32});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(size * 0.28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [color.withOpacity(0.85), color],
+          ),
+        ),
+        child: Icon(icon, size: size * 0.56, color: Colors.white),
+      );
+}
+
+/// One settings row: badge, title, optional subtitle, trailing control, and
+/// an optional [below] widget (a slider, a segmented control).
+class LxRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final Widget? below;
+  final VoidCallback? onTap;
+  final bool chevron;
+  const LxRow({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.below,
+    this.onTap,
+    this.chevron = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(children: [
+        Row(children: [
+          LxIconBadge(icon, color),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: LxColors.text(context))),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(subtitle!,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: LxColors.subtext(context))),
+              ],
+            ]),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+          if (chevron)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Icon(Icons.chevron_right_rounded,
+                  size: 22, color: LxColors.subtext(context).withOpacity(0.7)),
+            ),
+        ]),
+        if (below != null)
+          Padding(padding: const EdgeInsets.only(left: 46, top: 10), child: below!),
+      ]),
+    );
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, child: content),
+    );
+  }
+}
+
+/// Switch in the app's colors.
+class LxSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const LxSwitch({super.key, required this.value, required this.onChanged});
+  @override
+  Widget build(BuildContext context) => Switch.adaptive(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Colors.white,
+        activeTrackColor: LxColors.indigoDeep,
+      );
+}
+
+/// Pill-shaped segmented control.
+class LxSegmented<T> extends StatelessWidget {
+  final List<(T, String)> items;
+  final T value;
+  final ValueChanged<T> onChanged;
+  final bool compact;
+  const LxSegmented(
+      {super.key,
+      required this.items,
+      required this.value,
+      required this.onChanged,
+      this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = LxColors.isDark(context);
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+          color: LxColors.chip(context), borderRadius: BorderRadius.circular(11)),
+      child: Row(
+        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+        children: items.map((e) {
+          final sel = e.$1 == value;
+          final cell = GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onChanged(e.$1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              height: compact ? 30 : 34,
+              padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 6),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: sel
+                    ? (dark ? Colors.white.withOpacity(0.16) : Colors.white)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: sel && !dark
+                    ? [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2))
+                      ]
+                    : null,
+              ),
+              child: Text(e.$2,
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                      color: sel
+                          ? (dark ? Colors.white : LxColors.indigoDeep)
+                          : LxColors.subtext(context))),
+            ),
+          );
+          return compact ? cell : Expanded(child: cell);
+        }).toList(),
+      ),
+    );
+  }
+}
+
+/// Small colored status pill ("已连接").
+class LxStatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+  const LxStatusPill(this.label, this.color, {super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+            color: color.withOpacity(0.14),
+            borderRadius: BorderRadius.circular(20)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        ]),
       );
 }

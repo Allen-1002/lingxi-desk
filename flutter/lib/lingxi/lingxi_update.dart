@@ -1,6 +1,6 @@
 // Lingxi Desk: in-app update from GitHub Releases.
 //
-// A release is a tag vX.Y.Z on Allen-1002/lingxi-desk. All platforms share
+// A release is a tag vX.Y.Z on Allen-1002/nimbo. All platforms share
 // the version in flutter/pubspec.yaml, and each has one asset:
 //   Android  LingxiDesk-X.Y.Z-android-arm64.apk  (res/lingxi/release-android.sh)
 //   macOS    LingxiDesk-X.Y.Z-macos-arm64.zip    (res/lingxi/release-macos.sh)
@@ -313,7 +313,7 @@ start "" "${exe.path}"
     if (ok == true) return true;
     await gFFI.invokeMethod('lingxi_open_install_permission');
     _set(LxUpdateState.error,
-        err: '请在刚打开的页面里允许「灵犀」安装应用，然后回来再点一次更新');
+        err: '请在刚打开的页面里允许「Nimbo」安装应用，然后回来再点一次更新');
     return false;
   }
 

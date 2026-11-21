@@ -185,7 +185,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
           child: Row(children: [
             const LxLogo(size: 28),
             const SizedBox(width: 10),
-            Text('灵犀',
+            Text(kLxAppName,
                 style: TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w700,
@@ -446,7 +446,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
         if (devices.isEmpty)
           Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('同一网络里的灵犀设备会自动出现在这里',
+            child: Text('同一网络里装了 Nimbo 的设备会自动出现在这里',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: LxColors.subtext(context))),
           )
@@ -478,7 +478,6 @@ class _DesktopSettings extends StatefulWidget {
 }
 
 class _DesktopSettingsState extends State<_DesktopSettings> {
-  int _serverRev = 0;
   late bool _lanDirect;
   late String _quality;
   String _version = '';
@@ -489,7 +488,9 @@ class _DesktopSettingsState extends State<_DesktopSettings> {
     _lanDirect = option2bool(kOptionDirectServer,
         bind.mainGetOptionSync(key: kOptionDirectServer));
     _quality = bind.mainGetUserDefaultOption(key: kOptionImageQuality);
+    if (_quality.isEmpty) _quality = kRemoteImageQualityBalanced;
     LxUpdater.instance.loadCurrent();
+    bind.mainCheckConnectStatus();
     bind.mainGetVersion().then((v) {
       if (mounted) setState(() => _version = v);
     });
@@ -497,97 +498,84 @@ class _DesktopSettingsState extends State<_DesktopSettings> {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle t() => TextStyle(fontSize: 15, color: LxColors.text(context));
-    TextStyle s() => TextStyle(fontSize: 13, color: LxColors.subtext(context));
-    Widget qualityChip(String v, String label) {
-      final sel = (_quality.isEmpty ? kRemoteImageQualityBalanced : _quality) == v;
-      return Padding(
-        padding: const EdgeInsets.only(left: 6),
-        child: ChoiceChip(
-          label: Text(label),
-          selected: sel,
-          selectedColor: LxColors.indigo.withOpacity(0.18),
-          onSelected: (_) {
-            setState(() => _quality = v);
-            bind.mainSetUserDefaultOption(key: kOptionImageQuality, value: v);
-          },
-        ),
-      );
-    }
-
-    return ListView(
-      key: const ValueKey('settings'),
-      padding: const EdgeInsets.fromLTRB(28, 4, 28, 28),
-      children: [
-        Text('设置',
-            style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: LxColors.text(context))),
-        const SizedBox(height: 18),
-        const LxSectionTitle('连接'),
-        Glass(
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('局域网直连', style: t()),
-                const SizedBox(height: 2),
-                Text('同一网络里的设备不经过服务器，直接连接这台电脑', style: s()),
-              ]),
-            ),
-            Switch(
-              value: _lanDirect,
-              activeColor: Colors.white,
-              activeTrackColor: LxColors.indigoDeep,
-              onChanged: (v) async {
-                setState(() => _lanDirect = v);
-                await bind.mainSetOption(
-                    key: kOptionDirectServer, value: v ? 'Y' : 'N');
-              },
-            ),
-          ]),
-        ),
-        const SizedBox(height: 18),
-        const LxSectionTitle('控制别的电脑时的画质'),
-        Glass(
-          child: Row(children: [
-            Expanded(child: Text('画质偏好', style: t())),
-            qualityChip(kRemoteImageQualityLow, '流畅'),
-            qualityChip(kRemoteImageQualityBalanced, '平衡'),
-            qualityChip(kRemoteImageQualityBest, '清晰'),
-          ]),
-        ),
-        const SizedBox(height: 18),
-        const LxSectionTitle('连接'),
-        Glass(
-          child: Column(children: [
-            LxServerTile(key: ValueKey(_serverRev)),
-            if (lxCanDeployServer) ...[
-              const SizedBox(height: 10),
-              Divider(height: 1, color: LxColors.hairline(context)),
-              const SizedBox(height: 10),
-              LxDeployServerTile(onDone: () => setState(() => _serverRev++)),
-            ],
-          ]),
-        ),
-        const SizedBox(height: 18),
-        const LxSectionTitle('关于'),
-        Glass(
-          child: Column(children: [
-            Row(children: [
-              const LxLogo(size: 28),
-              const SizedBox(width: 12),
-              Text('灵犀', style: t()),
-              const Spacer(),
-              Text('内核 $_version', style: s()),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: ListView(
+          key: const ValueKey('settings'),
+          padding: const EdgeInsets.fromLTRB(28, 4, 28, 28),
+          children: [
+            const LxPageHeader('设置'),
+            const LxServerCard(),
+            LxGroup(title: '连接', children: [
+              LxRow(
+                icon: Icons.wifi_rounded,
+                color: LxColors.teal,
+                title: '局域网直连',
+                subtitle: '同一个网络里的设备直接连这台电脑，不绕服务器，延迟更低',
+                trailing: LxSwitch(
+                  value: _lanDirect,
+                  onChanged: (v) async {
+                    setState(() => _lanDirect = v);
+                    await bind.mainSetOption(
+                        key: kOptionDirectServer, value: v ? 'Y' : 'N');
+                  },
+                ),
+              ),
+              LxRow(
+                icon: Icons.tune_rounded,
+                color: const Color(0xFF8B5CF6),
+                title: '画质',
+                subtitle: '用这台电脑控制别的电脑时',
+                trailing: LxSegmented<String>(
+                  compact: true,
+                  items: const [
+                    (kRemoteImageQualityLow, '流畅'),
+                    (kRemoteImageQualityBalanced, '平衡'),
+                    (kRemoteImageQualityBest, '清晰'),
+                  ],
+                  value: _quality,
+                  onChanged: (v) {
+                    setState(() => _quality = v);
+                    bind.mainSetUserDefaultOption(
+                        key: kOptionImageQuality, value: v);
+                  },
+                ),
+              ),
             ]),
-            const SizedBox(height: 12),
-            Divider(height: 1, color: LxColors.hairline(context)),
-            const SizedBox(height: 10),
-            const LxUpdateTile(),
-          ]),
+            LxGroup(title: '关于', children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+                child: Row(children: [
+                  const LxLogo(size: 40),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(kLxAppName,
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: LxColors.text(context))),
+                          const SizedBox(height: 2),
+                          Text('内核 $_version',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: LxColors.subtext(context))),
+                        ]),
+                  ),
+                ]),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 6, 14, 12),
+                child: LxUpdateTile(),
+              ),
+            ]),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

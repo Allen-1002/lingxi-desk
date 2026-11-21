@@ -25,7 +25,7 @@ use serde_derive::{Deserialize, Serialize};
 pub const SERVER_VERSION: &str = "1.1.16";
 /// Where the programs are downloaded from when the app has none bundled.
 const DOWNLOAD_BASE: &str =
-    "https://github.com/Allen-1002/lingxi-desk/releases/download/server-1.1.16";
+    "https://github.com/Allen-1002/nimbo/releases/download/server-1.1.16";
 const REMOTE_TGZ: &str = "/tmp/lingxi-server.tgz";
 const REMOTE_SCRIPT: &str = "/tmp/lingxi-server-install.sh";
 

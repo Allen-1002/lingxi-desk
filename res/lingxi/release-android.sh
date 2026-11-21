@@ -20,7 +20,7 @@ cd "$(dirname "$0")/../.."
 
 NOTES="${1:?usage: $0 <notes.md>}"
 [[ -f "$NOTES" ]] || { echo "notes file $NOTES not found" >&2; exit 1; }
-REPO=Allen-1002/lingxi-desk
+REPO=Allen-1002/nimbo
 PROPS="${LINGXI_SIGNING:-$HOME/.config/lingxi-desk/android-release.properties}"
 [[ -f "$PROPS" ]] || { echo "missing signing config $PROPS" >&2; exit 1; }
 
@@ -57,5 +57,5 @@ APKSIGNER=$(ls "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/*/apksig
 if [[ -n "$APKSIGNER" ]]; then "$APKSIGNER" verify --print-certs "$OUT" | grep -i "sha-256"; fi
 
 gh release create "$TAG" "$OUT" --repo "$REPO" --target "$(git rev-parse HEAD)" \
-  --title "灵犀 $VER" --notes-file "$NOTES"
+  --title "Nimbo $VER" --notes-file "$NOTES"
 echo "published $TAG: $OUT"

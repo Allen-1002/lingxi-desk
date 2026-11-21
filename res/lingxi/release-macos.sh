@@ -17,7 +17,7 @@ cd "$(dirname "$0")/../.."
 
 APP="${1:?usage: $0 <LingxiDesk.app> [notes.md]}"
 NOTES="${2:-}"
-REPO=Allen-1002/lingxi-desk
+REPO=Allen-1002/nimbo
 SIGN="${LINGXI_MAC_SIGN:-$HOME/dev-tools/lingxi-sign-mac.sh}"
 [[ -d "$APP" ]] || { echo "$APP not found" >&2; exit 1; }
 [[ -x "$SIGN" ]] || { echo "signing script $SIGN not found" >&2; exit 1; }
@@ -49,6 +49,6 @@ else
   git fetch -q origin
   [[ -n "$(git branch -r --contains HEAD)" ]] || { echo "HEAD is not pushed" >&2; exit 1; }
   gh release create "$TAG" "$OUT" --repo "$REPO" --target "$(git rev-parse HEAD)" \
-    --title "灵犀 $VER" --notes-file "$NOTES"
+    --title "Nimbo $VER" --notes-file "$NOTES"
 fi
 echo "attached $OUT to $TAG"

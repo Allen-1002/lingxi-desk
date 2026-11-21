@@ -4,11 +4,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' hide Size;
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Socket;
 
 import 'package:ffi/ffi.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../common.dart';
 import '../models/platform_model.dart';
@@ -33,92 +34,239 @@ Future<void> lxSetServer(String server, String key) async {
           key: server.trim().isEmpty ? '' : key.trim()));
 }
 
-/// Settings row showing the current server, with a dialog to change it.
-class LxServerTile extends StatefulWidget {
-  const LxServerTile({super.key});
-  @override
-  State<LxServerTile> createState() => _LxServerTileState();
+/// Edit the server by hand. Returns true when it changed.
+Future<bool> lxEditServer(BuildContext context) async {
+  final addr = TextEditingController(text: lxServerAddress());
+  final key = TextEditingController(text: lxServerKey());
+  InputDecoration deco(String label, String hint) => InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: const OutlineInputBorder(),
+        isDense: true,
+      );
+  final r = await showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('填写服务器'),
+      content: SizedBox(
+        width: 400,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('填你已经部署好的服务器。手机和电脑要用同一台服务器才能在外面互相连上。',
+              style: TextStyle(
+                  fontSize: 13, height: 1.45, color: LxColors.subtext(ctx))),
+          const SizedBox(height: 14),
+          TextField(
+              controller: addr,
+              autocorrect: false,
+              keyboardType: TextInputType.url,
+              decoration: deco('地址', 'IP 或域名，例如 1.2.3.4')),
+          const SizedBox(height: 12),
+          TextField(
+              controller: key,
+              autocorrect: false,
+              decoration: deco('公钥', '部署时显示的公钥')),
+        ]),
+      ),
+      actions: [
+        if (lxServerAddress().isNotEmpty)
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, 'clear'),
+              child: Text('不用自己的服务器',
+                  style: TextStyle(color: LxColors.danger.withOpacity(0.9)))),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+        FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'save'),
+            child: const Text('保存')),
+      ],
+    ),
+  );
+  if (r == 'save') {
+    await lxSetServer(addr.text, key.text);
+    return true;
+  }
+  if (r == 'clear') {
+    await lxSetServer('', '');
+    return true;
+  }
+  return false;
 }
 
-class _LxServerTileState extends State<LxServerTile> {
-  late String _server = lxServerAddress();
+/// Short form of a key for display: "UqFcIP…C1WI=".
+String _shortKey(String k) =>
+    k.length <= 14 ? k : '${k.substring(0, 6)}…${k.substring(k.length - 5)}';
+
+/// The whole server story in one card: which server this device uses, whether
+/// it can be reached, and the actions that fit (deploy / fill in / change).
+class LxServerCard extends StatefulWidget {
+  const LxServerCard({super.key});
+  @override
+  State<LxServerCard> createState() => _LxServerCardState();
+}
+
+enum _Reach { checking, ok, down }
+
+class _LxServerCardState extends State<LxServerCard> {
+  String _server = '';
+  String _key = '';
+  _Reach _reach = _Reach.checking;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+    _timer = Timer.periodic(const Duration(seconds: 8), (_) => _check());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _reload() {
+    setState(() {
+      _server = lxServerAddress();
+      _key = lxServerKey();
+      _reach = _Reach.checking;
+    });
+    _check();
+  }
+
+  /// Desktop: registered with the server. Phone: the server port answers.
+  Future<void> _check() async {
+    final host = _server;
+    if (host.isEmpty) return;
+    var ok = false;
+    if (lxCanDeployServer) {
+      try {
+        final m = jsonDecode(await bind.mainGetConnectStatus())
+            as Map<String, dynamic>;
+        ok = (m['status_num'] ?? 0) == 1;
+      } catch (_) {}
+    }
+    if (!ok) {
+      final h = host.contains(':') ? host.split(':').first : host;
+      final port = host.contains(':')
+          ? int.tryParse(host.split(':').last) ?? 21116
+          : 21116;
+      try {
+        final s = await Socket.connect(h, port,
+            timeout: const Duration(seconds: 4));
+        s.destroy();
+        ok = true;
+      } catch (_) {}
+    }
+    if (mounted && host == _server) {
+      setState(() => _reach = ok ? _Reach.ok : _Reach.down);
+    }
+  }
 
   Future<void> _edit() async {
-    final addr = TextEditingController(text: lxServerAddress());
-    final key = TextEditingController(text: lxServerKey());
-    InputDecoration deco(String label, String hint) => InputDecoration(
-          labelText: label,
-          hintText: hint,
-          border: const OutlineInputBorder(),
-          isDense: true,
-        );
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('服务器'),
-        content: SizedBox(
-          width: 380,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('手机和电脑要用同一台服务器才能互相连上。扫码配对时，手机会自动用上电脑的服务器设置。',
-                style: TextStyle(
-                    fontSize: 13, height: 1.45, color: LxColors.subtext(ctx))),
-            const SizedBox(height: 14),
-            TextField(
-                controller: addr,
-                autocorrect: false,
-                keyboardType: TextInputType.url,
-                decoration: deco('地址', '例如 1.2.3.4')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: key,
-                autocorrect: false,
-                decoration: deco('公钥', '服务器给出的公钥')),
-          ]),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('保存')),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await lxSetServer(addr.text, key.text);
-      if (mounted) setState(() => _server = lxServerAddress());
-    }
+    if (await lxEditServer(context)) _reload();
+  }
+
+  Future<void> _deploy() async {
+    if (await lxShowDeployDialog(context)) _reload();
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: _edit,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('服务器',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: LxColors.text(context))),
-              const SizedBox(height: 2),
-              Text(_server.isEmpty ? '未设置（使用公共服务器）' : _server,
-                  style: TextStyle(
-                      fontSize: 13, color: LxColors.subtext(context))),
+    final desktop = lxCanDeployServer;
+    final has = _server.isNotEmpty;
+    final sub = TextStyle(
+        fontSize: 13, height: 1.45, color: LxColors.subtext(context));
+    final (String label, Color color) = !has
+        ? ('未设置', LxColors.warn)
+        : switch (_reach) {
+            _Reach.ok => ('正常', LxColors.online),
+            _Reach.down => ('连不上', LxColors.danger),
+            _Reach.checking => ('检查中', LxColors.subtext(context)),
+          };
+
+    Widget actions() {
+      final buttons = <Widget>[
+        if (desktop)
+          LxButton(has ? '重新部署' : '一键部署到我的服务器',
+              icon: Icons.rocket_launch_rounded,
+              height: 38,
+              secondary: has,
+              onPressed: _deploy),
+        LxButton(has ? '修改' : '填写已有服务器',
+            icon: has ? Icons.edit_rounded : Icons.dns_rounded,
+            height: 38,
+            secondary: desktop || has,
+            onPressed: _edit),
+      ];
+      return Wrap(spacing: 10, runSpacing: 10, children: buttons);
+    }
+
+    return LxGroup(
+      title: '服务器',
+      footer: desktop
+          ? '手机扫这台电脑的配对二维码，会自动用上同一台服务器。'
+          : '扫电脑上的配对二维码会自动同步服务器，一般不用手动填。',
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const LxIconBadge(Icons.dns_rounded, LxColors.indigo, size: 40),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(has ? _server : '还没有自己的服务器',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: LxColors.text(context))),
+                      const SizedBox(height: 3),
+                      if (has)
+                        Row(children: [
+                          Text('公钥 ${_shortKey(_key)}', style: sub),
+                          if (_key.isNotEmpty)
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: _key));
+                                showToast('公钥已复制');
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(Icons.copy_rounded,
+                                    size: 14, color: LxColors.subtext(context)),
+                              ),
+                            ),
+                        ])
+                      else
+                        Text('现在用的是公共服务器，手机在外面可能连不上',
+                            style: sub),
+                    ]),
+              ),
+              LxStatusPill(label, color),
             ]),
-          ),
-          Icon(Icons.chevron_right, color: LxColors.subtext(context)),
-        ]),
-      ),
+            if (has && _reach == _Reach.down) ...[
+              const SizedBox(height: 12),
+              Text(
+                  '连不上服务器。请检查服务器是否开着，以及云控制台的安全组或防火墙是否放行了 TCP 21115-21119 和 UDP 21116。',
+                  style: sub.copyWith(color: LxColors.danger)),
+            ],
+            if (!has && desktop) ...[
+              const SizedBox(height: 12),
+              Text('有一台 Linux 云服务器就行，填上 IP 和登录密码，几秒钟装好，不需要 Docker。',
+                  style: sub),
+            ],
+            const SizedBox(height: 14),
+            actions(),
+          ]),
+        ),
+      ],
     );
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // One-click server deploy (desktop). The work happens in the Rust core
@@ -174,45 +322,13 @@ bool get lxCanDeployServer =>
     (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
     _DeployFfi.instance != null;
 
-/// Settings row that opens the deploy dialog. [onDone] runs after the local
-/// server setting has been changed.
-class LxDeployServerTile extends StatelessWidget {
-  final VoidCallback? onDone;
-  const LxDeployServerTile({super.key, this.onDone});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!lxCanDeployServer) return const SizedBox.shrink();
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () async {
-        final changed = await showDialog<bool>(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => const _DeployDialog());
-        if (changed == true) onDone?.call();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('部署服务器',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: LxColors.text(context))),
-              const SizedBox(height: 2),
-              Text('把灵犀服务器一键装到你自己的 Linux 云服务器上',
-                  style: TextStyle(
-                      fontSize: 13, color: LxColors.subtext(context))),
-            ]),
-          ),
-          Icon(Icons.chevron_right, color: LxColors.subtext(context)),
-        ]),
-      ),
-    );
-  }
+/// Show the deploy dialog. Returns true when this device's server changed.
+Future<bool> lxShowDeployDialog(BuildContext context) async {
+  final changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _DeployDialog());
+  return changed == true;
 }
 
 class _DeployDialog extends StatefulWidget {

@@ -30,7 +30,7 @@
     <application
         android:name=".MainApplication"
         android:icon="@mipmap/ic_launcher"
-        android:label="灵犀"
+        android:label="Nimbo"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true">
 
@@ -50,7 +50,7 @@
             android:name=".InputService"
             android:enabled="true"
             android:exported="false"
-            android:label="灵犀 输入"
+            android:label="Nimbo 输入"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

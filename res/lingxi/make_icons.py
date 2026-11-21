@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Lingxi Desk app icons from one drawing.
+"""Generate Nimbo app icons from one drawing.
 
-Concept: 心有灵犀一点通 - two curves rise from either side and meet, with the
-"one point" (一点) glowing above where they meet.
+Concept: a soft white cloud (Nimbo, 云朵) on the teal-to-indigo tile.
 
 Run from the repo root:  python3 res/lingxi/make_icons.py
 Needs Pillow. Writes every icon the Android, macOS, Windows and Flutter builds use.
@@ -42,27 +41,23 @@ def bezier(p0, p1, p2, n=96):
     return pts
 
 
-# Glyph in unit coordinates (0..1 box).
-LEFT = ((0.36, 0.84), (0.10, 0.50), (0.42, 0.40))
-RIGHT = ((0.64, 0.84), (0.90, 0.50), (0.58, 0.40))
-STROKE = 0.09
-DOT = ((0.5, 0.25), 0.08)
+# Glyph in unit coordinates (0..1 box): a cloud made of three puffs on a
+# rounded base.
+DY = 0.03
+PUFFS = [((0.33, 0.56 + DY), 0.17), ((0.54, 0.44 + DY), 0.22), ((0.72, 0.58 + DY), 0.15)]
+BASE = ((0.16, 0.55 + DY, 0.87, 0.73 + DY), 0.09)
 
 
 def draw_glyph(img, box, color=WHITE):
     """Draw the glyph into img inside box=(x0, y0, size)."""
     x0, y0, s = box
     d = ImageDraw.Draw(img)
-    w = STROKE * s
-    for curve in (LEFT, RIGHT):
-        # Stamp discs along the curve: smooth round stroke without line-join artifacts.
-        r = w / 2
-        for x, y in bezier(*curve, n=600):
-            cx, cy = x0 + x * s, y0 + y * s
-            d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=color)
-    (cx, cy), r = DOT
-    cx, cy, r = x0 + cx * s, y0 + cy * s, r * s
-    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=color)
+    for (cx, cy), r in PUFFS:
+        cx, cy, r = x0 + cx * s, y0 + cy * s, r * s
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=color)
+    (bx0, by0, bx1, by1), br = BASE
+    d.rounded_rectangle(
+        (x0 + bx0 * s, y0 + by0 * s, x0 + bx1 * s, y0 + by1 * s), br * s, fill=color)
 
 
 def rounded_mask(size, radius):
@@ -99,22 +94,19 @@ def save(img, path):
 
 
 def svg():
-    def path(c):
-        (ax, ay), (bx, by), (cx, cy) = [(x * 100, y * 100) for x, y in c]
-        return f"M{ax:.1f} {ay:.1f} Q{bx:.1f} {by:.1f} {cx:.1f} {cy:.1f}"
-
     g = 0.8
     o = (1 - g) / 2 * 100
-    (dx, dy), dr = DOT
+    puffs = "".join(
+        f'<circle cx="{cx * 100:.1f}" cy="{cy * 100:.1f}" r="{r * 100:.1f}"/>'
+        for (cx, cy), r in PUFFS)
+    (bx0, by0, bx1, by1), br = BASE
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#14B8A6"/><stop offset="1" stop-color="#4F46E5"/>
   </linearGradient></defs>
   <rect width="100" height="100" rx="22.5" fill="url(#g)"/>
-  <g transform="translate({o:.1f} {o + 2:.1f}) scale({g})" fill="none" stroke="#fff"
-     stroke-width="{STROKE * 100:.1f}" stroke-linecap="round">
-    <path d="{path(LEFT)}"/><path d="{path(RIGHT)}"/>
-    <circle cx="{dx * 100:.1f}" cy="{dy * 100:.1f}" r="{dr * 100:.1f}" fill="#fff" stroke="none"/>
+  <g transform="translate({o:.1f} {o + 2:.1f}) scale({g})" fill="#fff">
+    {puffs}<rect x="{bx0 * 100:.1f}" y="{by0 * 100:.1f}" width="{(bx1 - bx0) * 100:.1f}" height="{(by1 - by0) * 100:.1f}" rx="{br * 100:.1f}"/>
   </g>
 </svg>
 '''
