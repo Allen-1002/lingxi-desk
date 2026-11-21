@@ -171,7 +171,6 @@ class _LingxiMobileHomeState extends State<LingxiMobileHome> {
                 ),
               ),
             ),
-            ),
           ]),
           const SizedBox(height: 20),
           const LxUpdateTile(banner: true),
