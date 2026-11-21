@@ -46,6 +46,10 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
     }
   }
 
+  // Kept across rebuilds: the page rebuilds every few seconds and a controller
+  // made in build() wiped the device code while it was being typed.
+  final _codeCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +72,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
   @override
   void dispose() {
     windowManager.removeListener(this);
+    _codeCtrl.dispose();
     _timer?.cancel();
     gFFI.lanPeersModel.removeListener(_changed);
     gFFI.recentPeersModel.removeListener(_changed);
@@ -407,7 +412,7 @@ class _LingxiDesktopHomeState extends State<LingxiDesktopHome>
 
   Widget _devices(BuildContext context) {
     final devices = lxCollectDevices(_id);
-    final ctrl = TextEditingController();
+    final ctrl = _codeCtrl;
     return ListView(
       key: const ValueKey('devices'),
       padding: const EdgeInsets.fromLTRB(28, 4, 28, 28),
